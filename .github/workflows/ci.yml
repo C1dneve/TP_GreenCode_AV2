@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: greencode_test
+          POSTGRES_PASSWORD: greencode_test
+          POSTGRES_DB: greencode_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U greencode_test -d greencode_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      PORT: 3000
+      HOST: 127.0.0.1
+      DATABASE_URL: postgresql://greencode_test:greencode_test@localhost:5432/greencode_test?schema=public
+      JWT_SECRET: ci-only-not-a-production-secret
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Compile TypeScript
+        run: npm run build
+      - name: Run automated tests
+        run: npm test
