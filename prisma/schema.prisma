@@ -160,18 +160,19 @@ model Equipamento {
   anoFabricacao      Int
   estadoFisico       EstadoFisico
   pesoQuilogramas    Decimal            @db.Decimal(10, 3)
-  loteId             String             @db.Uuid
-  posicaoNoLote       Int
+  loteId             String?            @db.Uuid
+  posicaoNoLote       Int?
   statusRastreamento StatusRastreamento  @default(AGUARDANDO_TRIAGEM)
   ativo              Boolean            @default(true)
   valorAquisicao     Decimal            @default(0) @db.Decimal(12, 2)
   createdAt          DateTime           @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime           @updatedAt @db.Timestamptz(3)
   versao             Int                @default(1)
-  lote               Lote               @relation(fields: [loteId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  lote               Lote?              @relation(fields: [loteId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   movimentacoes      Movimentacao[]
 
-  @@unique([loteId, posicaoNoLote])
+  // SQL migration owns the partial unique index: Prisma @@unique requires all
+  // compound fields to be mandatory, but this approved relationship is optional.
   @@index([loteId, statusRastreamento])
   @@index([tipo, estadoFisico])
   @@index([ativo])

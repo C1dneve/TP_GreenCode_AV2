@@ -31,7 +31,7 @@ export function buildApp(): FastifyInstance {
       tags: [{ name: "Health", description: "Estado técnico do serviço" }],
     },
   });
-  app.register(swaggerUi, { routePrefix: "/docs" });
+
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     const validationError = Boolean((error as FastifyError & { validation?: unknown }).validation);
@@ -67,22 +67,26 @@ export function buildApp(): FastifyInstance {
     });
   });
 
-  app.get("/health", {
-    schema: {
-      tags: ["Health"],
-      summary: "Verifica se o servidor HTTP está respondendo.",
-      response: {
-        200: {
-          type: "object",
-          required: ["status", "service"],
-          properties: {
-            status: { type: "string", const: "ok" },
-            service: { type: "string", const: "greencode-api" },
+  app.register(async (instance: FastifyInstance) => {
+    instance.get("/health", {
+      schema: {
+        tags: ["Health"],
+        summary: "Verifica se o servidor HTTP está respondendo.",
+        response: {
+          200: {
+            type: "object",
+            required: ["status", "service"],
+            properties: {
+              status: { type: "string", const: "ok" },
+              service: { type: "string", const: "greencode-api" },
+            },
           },
         },
       },
-    },
-  }, async () => ({ status: "ok", service: "greencode-api" }));
+    }, async () => ({ status: "ok", service: "greencode-api" }));
+  });
+
+  app.register(swaggerUi, { routePrefix: "/docs" });
 
   return app;
 }

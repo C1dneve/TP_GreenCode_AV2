@@ -20,8 +20,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
 
   const databaseUrl = requireString("DATABASE_URL", env.DATABASE_URL);
-  if (!databaseUrl.startsWith("postgresql://") && !databaseUrl.startsWith("postgres://")) {
-    throw new Error("DATABASE_URL deve ser uma URL PostgreSQL válida.");
+  try {
+    const parsedDatabaseUrl = new URL(databaseUrl);
+    const supportedProtocol = parsedDatabaseUrl.protocol === "postgresql:" || parsedDatabaseUrl.protocol === "postgres:";
+    const hasDatabaseName = parsedDatabaseUrl.pathname.length > 1;
+    if (!supportedProtocol || !parsedDatabaseUrl.hostname || !hasDatabaseName) {
+      throw new Error("invalid");
+    }
+  } catch {
+    // Never echo the connection URL: it may contain credentials.
+    throw new Error("DATABASE_URL deve ser uma URL PostgreSQL válida com host e nome do banco.");
   }
 
   const jwtSecret = requireString("JWT_SECRET", env.JWT_SECRET);

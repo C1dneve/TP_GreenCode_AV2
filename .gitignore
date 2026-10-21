@@ -8,3 +8,7 @@ coverage/
 *.log
 .DS_Store
 Thumbs.db
+
+# Local and secret-bearing environment files
+.env.local
+.env.*.local
