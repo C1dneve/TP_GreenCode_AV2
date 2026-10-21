@@ -3,16 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "GreenCode AV2 - monÃ³lito HTTP em Node.js, TypeScript, Fastify e Prisma",
+  "description": "GreenCode AV2 — API REST de logística reversa",
+  "engines": { "node": ">=24 <25" },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/server.js",
-    "test": "tsx --test src/tests/app.test.ts",
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "start": "node dist/src/server.js",
+    "test": "npm run build && node --test dist/src/tests/*.test.js",
     "prisma:validate": "prisma validate",
     "prisma:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
     "db:studio": "prisma studio"
   },
   "dependencies": {
@@ -27,15 +29,10 @@
     "pg": "^8.23.1"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
+    "@types/node": "^24.10.0",
     "@types/pg": "^8.23.1",
-    "prisma": "^7.10.0",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
-  },
-  "allowScripts": {
-    "prisma@7.10.1": true,
-    "@prisma/engines@7.10.1": true,
-    "esbuild@0.28.2": true
+    "typescript": "^5.9.3",
+    "prisma": "^7.10.1"
   }
 }

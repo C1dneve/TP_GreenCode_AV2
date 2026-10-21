@@ -7,39 +7,34 @@ on:
     branches: [main]
 
 jobs:
-  quality:
-    runs-on: ubuntu-24.04
+  test:
+    runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:18
+        image: postgres:17-alpine
         env:
-          POSTGRES_USER: greencode_test
-          POSTGRES_PASSWORD: greencode_test
+          POSTGRES_USER: greencode
+          POSTGRES_PASSWORD: greencode_ci
           POSTGRES_DB: greencode_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U greencode_test -d greencode_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-cmd "pg_isready -U greencode -d greencode_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     env:
       NODE_ENV: test
-      PORT: 3000
       HOST: 127.0.0.1
-      DATABASE_URL: postgresql://greencode_test:greencode_test@localhost:5432/greencode_test?schema=public
-      JWT_SECRET: ci-only-not-a-production-secret
+      PORT: 3000
+      DATABASE_URL: postgresql://greencode:greencode_ci@localhost:5432/greencode_test?schema=public
+      JWT_SECRET: ci-only-secret-with-more-than-32-characters
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Configure Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Compile TypeScript
-        run: npm run build
-      - name: Run automated tests
-        run: npm test
+      - run: npm install
+      - run: npm run prisma:validate
+      - run: npm run db:deploy
+      - run: npm test
