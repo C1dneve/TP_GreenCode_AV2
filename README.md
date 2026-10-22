@@ -162,3 +162,8 @@ Toda a documentação do projeto fica em `docs/`. Comece por [`docs/README.md`](
 A matriz não declara uma User Story concluída apenas porque possui documentação. O estado de implementação e validação deve ser atualizado com evidências reais.
 
 Consulte [`docs/10-matriz-de-rastreabilidade.md`](docs/10-matriz-de-rastreabilidade.md).
+
+
+## G1 — Autenticação e usuários
+
+Com Node.js 24 instalado e o PostgreSQL configurado, execute `npm ci`, `npm run prisma:validate`, `npm run build` e `npm test`. A API usa `JWT_SECRET` com pelo menos 32 bytes. Para iniciar o servidor, configure `DATABASE_URL` e `JWT_SECRET` e execute `npm run dev`. O login é `POST /api/v1/auth/login`; as rotas administrativas em `/api/v1/usuarios` exigem papel `ADMINISTRADOR`. O contrato completo e as limitações do incremento estão em `docs/contrato-api-rest.md` e `docs/10-matriz-de-rastreabilidade.md`.

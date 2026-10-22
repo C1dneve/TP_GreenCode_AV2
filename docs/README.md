@@ -32,4 +32,4 @@ A pasta `spec/` atualmente contém cópias anteriores dos mesmos documentos de p
 
 ## Estado de validação conhecido
 
-O responsável confirmou sucesso para `npm install`, `npm run prisma:validate` e `npm run build`. Migração PostgreSQL, seed, `npm test` e os fluxos de autenticação/negócio precisam de validação/implementação próprias. A matriz de rastreabilidade registra essa diferença.
+A fundação do Dia 1 foi documentada previamente como validada pelo responsável. No incremento G1 de 22/10/2026 foram adicionados os módulos de autenticação, usuários e auditoria e uma migração para `authVersion`; porém a validação deste incremento permanece pendente: o ambiente atual só oferece Node.js 22 (o projeto exige Node.js 24) e `npm ci` não concluiu por indisponibilidade de dependências, fazendo `npm run build` falhar com `prisma: not found`. Não declarar migração, testes ou CI como aprovados até repetir os comandos em Node 24 com dependências e PostgreSQL disponíveis. Consulte a matriz de rastreabilidade para o estado por requisito.

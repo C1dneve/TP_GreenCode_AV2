@@ -63,3 +63,11 @@ A CI deve instalar com lockfile (`npm ci`), compilar, executar testes e validar 
 ## 6. Definição de pronto
 
 Uma história só está pronta quando: regras no service; autorização conforme matriz; schemas e erros documentados; persistência/transação correta; testes relevantes aprovados; OpenAPI/README atualizado; nenhum segredo introduzido; e evidência de validação guardada quando for requisito de entrega.
+
+
+## Evidências do incremento G1 (22/10/2026)
+
+- Foram adicionadas rotas de autenticação e gerenciamento administrativo, proteção JWT, invalidação global por `authVersion` e serviço/repositório de auditoria.
+- A migração `20261022080000_usuario_auth_version` adiciona o campo de versão de autenticação sem reescrever migrações anteriores.
+- **Validação pendente neste ambiente:** a instalação das dependências não terminou dentro do tempo disponível e o runtime disponível reporta Node.js 22, enquanto o projeto exige Node.js 24. Não declarar build, testes HTTP/RBAC ou integração PostgreSQL como aprovados até executá-los em Node 24 com dependências instaladas e banco acessível.
+- O endpoint de consulta de auditoria não faz parte da implementação G1 entregue.

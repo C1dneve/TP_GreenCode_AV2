@@ -55,7 +55,18 @@ Os estados abaixo refletem apenas evidências conhecidas em 21/10/2026. Não pre
 | RT-021 | Testes unitários, integração, RBAC e jornada ponta a ponta | `testes-e-criterios-de-aceite.md` | ADR-0001/0002 | US-AV2-040 | `src/tests/`, banco de teste, CI | Testes básicos estão escritos, mas `npm test` e integração PostgreSQL não têm resultado confirmado. **VALIDAÇÃO-PENDENTE** |
 | RT-022 | README, OpenAPI, ADRs, migração/seed e homologação documentados | `visao-geral-e-escopo.md`; `testes-e-criterios-de-aceite.md`; `plano-de-implementacao.md` | ADR-0001/0002 | US-AV2-039, 041 | README, `docs/`, `.github/workflows/ci.yml`, lockfile | Documentação canônica preparada; `package-lock.json` deve ser versionado e workflow migrado para `npm ci` antes de declarar CI reproduzível. **CODE-PARCIAL** |
 
-## 4. Rastreabilidade entre arquivos de documentação
+## 4. Atualização do incremento G1 — 22/10/2026
+
+| Requisito | Código/documento | Estado após implementação | Evidência disponível |
+|---|---|---|---|
+| Login JWT, guard, `/me`, logout e troca de senha | `src/modules/auth/routes.ts`, `src/app.ts` | `CODE-PARCIAL` | Código adicionado; build/testes ainda não executados neste ambiente.
+| Usuários administrativos e RBAC | `src/modules/usuarios/routes.ts` | `CODE-PARCIAL` | Rotas adicionadas com schemas, checagem de papel atual e controles de versão; testes HTTP completos pendentes.
+| Invalidação de sessões por alteração de senha/status | `Usuario.authVersion`, migração `20261022080000_usuario_auth_version` | `VALIDAÇÃO-PENDENTE` | Migração criada; não aplicada a PostgreSQL neste ambiente.
+| Auditoria transacional de segurança | `src/modules/auditoria/` | `CODE-PARCIAL` | Serviço/repositório aceitam transação Prisma; persistência ainda sem teste de banco.
+| Consulta de auditoria | fora do escopo de rotas G1 implementadas | `PENDENTE` | Nenhum endpoint de consulta entregue.
+| Build, testes unitários/HTTP/RBAC e integração | `npm run build`, `npm test`, `npm run test:integration` | `VALIDAÇÃO-PENDENTE` | `npm ci` não concluiu e o runtime disponível é Node 22, incompatível com o requisito Node 24.
+
+## 5. Rastreabilidade entre arquivos de documentação
 
 Esta tabela responde quais arquivos são fonte, quais aprofundam o assunto e quais transformam a decisão em backlog/evidência.
 
@@ -76,7 +87,7 @@ Esta tabela responde quais arquivos são fonte, quais aprofundam o assunto e qua
 | `adr/ADR-0002-decisoes-dominio.md` | AV1, ER/NEG/SEG/REST, confirmação final | `03`, `04`, `05`, `06`, `07` | Fonte normativa para escolhas aprovadas |
 | `referencias/planejamento-pre-decisao/*` | Documentos de planejamento antes da confirmação | Rastreabilidade histórica apenas | Preservação histórica; não substituem ADRs |
 
-## 5. Rastreabilidade por épico
+## 6. Rastreabilidade por épico
 
 | Épico | Escopo | User Stories | Teste/evidência mínima |
 |---|---|---|---|
@@ -90,7 +101,7 @@ Esta tabela responde quais arquivos são fonte, quais aprofundam o assunto e qua
 | E7 — Movimentações | Registrar e consultar trilha imutável | US-AV2-034–035 | Ator do token, origem do histórico, append-only e RBAC |
 | E8 — Auditoria, relatórios e entrega | Logs de auditoria, parâmetros, OpenAPI, testes e README | US-AV2-036–041 | Auditoria transacional, relatórios, defaults, CI e jornada completa |
 
-## 6. Como manter a matriz atualizada
+## 7. Como manter a matriz atualizada
 
 Após cada incremento:
 
@@ -101,6 +112,6 @@ Após cada incremento:
 5. Se uma decisão mudar, atualize ADR e documentos dependentes no mesmo commit.
 6. Não marque uma rota como concluída só porque aparece na proposta de API; confirme a implementação e o teste.
 
-## 7. Critério para encerrar um requisito
+## 8. Critério para encerrar um requisito
 
 Um requisito só é encerrado quando há vínculo explícito com pelo menos uma US, implementação na camada esperada, testes relevantes passando e evidência registrável (saída do teste, CI verde ou validação reproduzível). Para regras críticas, a evidência deve incluir caminho negativo e autorização aplicável.

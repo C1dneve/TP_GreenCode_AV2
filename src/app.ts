@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
+import jwt from "@fastify/jwt";
+import type { PrismaClient } from "./generated/prisma/client.js";
+import { registerAuthRoutes } from "./modules/auth/routes.js";
+import { registerUserRoutes } from "./modules/usuarios/routes.js";
 
 interface ApiErrorBody {
   error: {
@@ -12,9 +16,11 @@ interface ApiErrorBody {
   };
 }
 
-export function buildApp(): FastifyInstance {
+export interface BuildAppOptions { prisma?: PrismaClient; jwtSecret?: string }
+
+export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({
-    logger: process.env.NODE_ENV !== "test",
+    logger: process.env.NODE_ENV !== "test" ? { redact: { paths: ["req.headers.authorization", "req.headers.cookie", "req.body.senha", "req.body.senhaAtual", "req.body.novaSenha", "req.body.accessToken", "req.body.password", "req.body.token", "*.senhaHash", "*.JWT_SECRET", "*.DATABASE_URL"], censor: "[REDACTED]" } } : false,
     disableRequestLogging: process.env.NODE_ENV === "test",
     requestIdHeader: "x-request-id",
     genReqId: () => `req-${randomUUID()}`,
@@ -28,7 +34,8 @@ export function buildApp(): FastifyInstance {
         version: "0.1.0",
       },
       servers: [{ url: "http://localhost:3000" }],
-      tags: [{ name: "Health", description: "Estado técnico do serviço" }],
+      tags: [{ name: "Health", description: "Estado técnico do serviço" }, { name: "Autenticação", description: "Login e gestão da sessão" }, { name: "Usuários", description: "Gerenciamento administrativo de usuários" }],
+      components: { securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" } }, schemas: { UsuarioPublico: { type: "object", additionalProperties: false, required: ["id", "usuario", "nome", "papel", "ativo"], properties: { id: { type: "string", format: "uuid" }, usuario: { type: "string" }, nome: { type: "string" }, papel: { type: "string", enum: ["ADMINISTRADOR", "OPERADOR_CADASTRO", "GESTOR_ALMOXARIFADO", "AUDITOR"] }, ativo: { type: "boolean" }, ultimoAcesso: { type: "string", format: "date-time", nullable: true }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" }, versao: { type: "integer" } } }, Erro: { type: "object", required: ["error"], properties: { error: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" }, details: {}, requestId: { type: "string" } } } } } } },
     },
   });
 
@@ -53,7 +60,7 @@ export function buildApp(): FastifyInstance {
         reason: issue.message || "invalid",
       }));
     }
-    if (statusCode === 500) request.log.error({ err: error }, "Falha inesperada na requisição");
+    if (statusCode === 500) request.log.error({ requestId: request.id, errorName: error.name, errorCode: error.code }, "Falha inesperada na requisição");
     reply.code(statusCode).send(body);
   });
 
@@ -85,6 +92,14 @@ export function buildApp(): FastifyInstance {
       },
     }, async () => ({ status: "ok", service: "greencode-api" }));
   });
+
+  if (options.prisma && options.jwtSecret) {
+    app.register(jwt, { secret: options.jwtSecret, sign: { algorithm: "HS256", expiresIn: "30m" }, verify: { algorithms: ["HS256"] } });
+    app.register(async (instance) => {
+      registerAuthRoutes(instance, options.prisma as PrismaClient);
+      registerUserRoutes(instance, options.prisma as PrismaClient);
+    });
+  }
 
   app.register(swaggerUi, { routePrefix: "/docs" });
 
