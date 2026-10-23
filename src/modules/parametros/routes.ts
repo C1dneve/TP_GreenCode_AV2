@@ -1,0 +1,8 @@
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { ParametrosController } from "./parametros.controller.js";
+const err = { $ref: "Erro#" } as const;
+export function registerParametrosRoutes(app: FastifyInstance, controller: ParametrosController) {
+  const admin = { preHandler: [app.authenticate, async (request: FastifyRequest, reply: FastifyReply) => { if (request.user.papel !== "ADMINISTRADOR") return reply.code(403).send({ error: { code: "FORBIDDEN", message: "Permissão insuficiente.", requestId: request.id } }); }] };
+  app.get("/api/v1/parametros", { ...admin, schema: { tags: ["Parâmetros"], security: [{ bearerAuth: [] }], response: { 200: { type: "object", properties: { id: { type: "string" }, aliquotaImpostoPercentual: { type: "string" }, taxaDepreciacaoAnualPercentual: { type: "string" }, atualizadoPorId: { type: ["string", "null"] }, versao: { type: "integer" } } }, 403: err, 404: err } } }, async request => controller.get(request.user.papel));
+  app.patch("/api/v1/parametros", { ...admin, schema: { tags: ["Parâmetros"], security: [{ bearerAuth: [] }], body: { type: "object", additionalProperties: false, required: ["versaoEsperada"], properties: { versaoEsperada: { type: "integer", minimum: 1 }, aliquotaImpostoPercentual: { type: "number", minimum: 0, maximum: 100 }, taxaDepreciacaoAnualPercentual: { type: "number", minimum: 0, maximum: 100 } } }, response: { 200: { type: "object", additionalProperties: true }, 400: err, 403: err, 404: err, 409: err } } }, async request => controller.update(request.body as any, request.user.sub, request.id, request.user.papel));
+}

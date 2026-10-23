@@ -45,7 +45,7 @@ As regras a seguir consolidam o domínio herdado da AV1 e as decisões aprovadas
 4. Só pode ser movimentado ou atualizado quando estiver ativo.
 5. Mudanças de `statusRastreamento` exigem justificativa textual não vazia.
 6. `EM_DESMONTE` só é permitido quando o estado atual é `AGUARDANDO_DESMONTE`.
-7. A ordem de estados físicos é a listada em [03 — Modelo de dados](03-modelo-de-dados.md). Uma queda de duas ou mais categorias nessa ordem exige justificativa textual não vazia.
+7. A ordem de estados físicos é a listada em [Modelo de dados](modelo-de-dados.md). Uma queda de duas ou mais categorias nessa ordem exige justificativa textual não vazia.
 8. Uma mudança de estado físico também deve produzir o evento de histórico correspondente/auditoria.
 9. Desativação é lógica; o equipamento e suas movimentações não podem ser removidos fisicamente. Equipamento desativado não pode ser atualizado ou movimentado até ser reativado.
 10. Peso total do lote é calculado pela soma dos pesos dos equipamentos vinculados; não manter total duplicado como fonte de verdade.

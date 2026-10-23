@@ -64,6 +64,8 @@ Não usar `422` no contrato inicial.
 
 Login recebe `{ "usuario": "...", "senha": "..." }`. Resposta inclui `accessToken`, `tokenType: "Bearer"`, `expiresIn: 1800` e dados públicos do usuário (`id`, `usuario`, `nome`, `papel`, `ativo`). Nunca devolver senha/hash.
 
+A sessão usa JWT HS256 com validade de 30 minutos. As rotas protegidas consultam o usuário ativo, o `jti` revogado e `authVersion` no banco; a autorização usa o papel atual do registro. A troca e a redefinição de senha incrementam `authVersion`, invalidando todas as sessões emitidas anteriormente. `POST /api/v1/auth/change-password` recebe `{ "senhaAtual": "...", "novaSenha": "..." }` e retorna `204`.
+
 ## 6. Usuários — Administrador
 
 | Método | Rota | Objetivo |
@@ -76,7 +78,7 @@ Login recebe `{ "usuario": "...", "senha": "..." }`. Resposta inclui `accessToke
 | POST | `/api/v1/usuarios/:usuarioId/reativacao` | Reativar |
 | POST | `/api/v1/usuarios/:usuarioId/redefinicao-senha` | Iniciar redefinição administrativa conforme política |
 
-Não permitir auto-desativação nem desativar último Administrador ativo. Login único após normalização.
+Não permitir auto-desativação nem desativar/rebaixar o último Administrador ativo. Login único após normalização. A criação recebe `usuario`, `nome`, `senha` e `papel`; PATCH recebe `versaoEsperada` e apenas `usuario`, `nome` e/ou `papel`; redefinição administrativa recebe `novaSenha` com pelo menos 12 caracteres e retorna `204`. Todas as rotas administrativas exigem `ADMINISTRADOR`.
 
 ## 7. Organizações — Administrador e Operador de Cadastro
 

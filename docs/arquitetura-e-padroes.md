@@ -32,7 +32,7 @@ PostgreSQL
 
 ### Services
 
-- aplicar validações de domínio e autorização por papel;
+- aplicar validações de domínio e autorização por papel, revalidando o RBAC mesmo quando o service é invocado sem passar pelo guard HTTP; o papel deve vir do contexto autenticado (papel atual persistido), nunca do payload do cliente;
 - controlar pré-condições e transições de estado;
 - orquestrar transações, auditoria e controle otimista;
 - não depender de objetos `request` ou `reply` do Fastify.
@@ -79,10 +79,10 @@ O servidor deve tratar falhas de inicialização com mensagens claras e encerrar
 - erro: `{ "error": { "code", "message", "details?", "requestId?" } }`;
 - não retornar stack trace, hashes, credenciais, JWT, segredos, query SQL nem detalhes internos do Prisma.
 
-Consulte [06 — Contrato da API REST](06-contrato-api-rest.md) para os códigos HTTP e o catálogo de rotas.
+Consulte [Contrato da API REST](contrato-api-rest.md) para os códigos HTTP e o catálogo de rotas.
 
 ## 6. Compatibilidade e CI
 
 A entrega deve ser validável em Windows 10 ou superior e Ubuntu 24.04.03 ou superior/distribuições derivadas, conforme o enunciado. CI deverá executar instalação reproduzível, build, testes e testes de banco/migração quando o ambiente do workflow os disponibilizar.
 
-**Estado:** a arquitetura é a decisão normativa; não significa que todos os módulos estejam implementados. Ver [09 — Plano de implementação](09-plano-de-implementacao.md).
+**Validação:** o build, os testes de arquitetura e os testes HTTP registrados passaram. Consulte o [Plano de implementação](plano-de-implementacao.md) para ver a cobertura confirmada e as pendências restantes.
