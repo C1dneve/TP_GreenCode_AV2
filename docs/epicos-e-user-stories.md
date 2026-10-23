@@ -2,6 +2,8 @@
 
 **Escopo aprovado:** `ENT1-A`. P0 é obrigatório para o núcleo da entrega. P1 é complementar/priorizado depois do núcleo; não implica exclusão automática. A triagem permanece simplificada, conforme a confirmação de 20/10/2026.
 
+**Estado de validação em 23/10/2026:** o build local, 25 testes unitários/HTTP e 10 testes de integração passaram; a jornada HTTP básica de organização, contrato, lote, equipamento, triagem e movimentação também foi executada. Isso ainda não homologa todas as User Stories: a matriz indica os cenários que continuam sem evidência e a CI remota ainda precisa ser conferida após o push.
+
 ## E0 — Fundação HTTP, configuração e arquitetura
 
 **Objetivo:** iniciar um monólito HTTP reproduzível, com camadas e erros consistentes.

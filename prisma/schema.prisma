@@ -68,6 +68,7 @@ model Usuario {
   createdAt             DateTime           @default(now()) @db.Timestamptz(3)
   updatedAt             DateTime           @updatedAt @db.Timestamptz(3)
   versao                Int                @default(1)
+  authVersion           Int                @default(1)
   tokensRevogados       TokenRevogado[]
   movimentacoes         Movimentacao[]
   auditorias            EventoAuditoria[]   @relation("AuditoriaAtor")

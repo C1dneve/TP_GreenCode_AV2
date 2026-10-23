@@ -1,164 +1,115 @@
 # GreenCode AV2
 
-API REST monolítica para logística reversa. A AV2 é uma implementação nova, orientada pelo enunciado da atividade, pelas decisões aprovadas e pelas regras de negócio herdadas da AV1. O ZIP legado é usado somente como referência; a CLI e a persistência local da AV1 não fazem parte da nova arquitetura.
+API REST monolítica para apoiar a logística reversa de equipamentos. A AV2 preserva as regras de domínio importantes da AV1, mas entrega o backend como uma API HTTP; uma SPA completa não faz parte deste escopo.
 
-> **Estado em 21/10/2026:** `npm install`, `npm run prisma:validate` e `npm run build` foram executados localmente com sucesso. A aplicação ainda não está funcional ponta a ponta: a migração contra PostgreSQL, o seed e os testes de runtime precisam ser executados. Autenticação, RBAC e endpoints de negócio continuam no backlog de implementação.
+**Estado atual:** o build e os testes locais executados passaram. Isso é um bom marco, mas ainda não representa a homologação completa de todas as regras ou a aprovação da CI do GitHub. O recorte validado e as pendências estão documentados em [`docs/relatorio-final-av2.md`](docs/relatorio-final-av2.md).
 
-## Stack
+## Tecnologias
 
-- Node.js 24 LTS e TypeScript
+- Node.js 24.x e TypeScript
 - Fastify 5
-- Prisma ORM 7 com driver adapter PostgreSQL
-- PostgreSQL 17 para desenvolvimento local
+- Prisma ORM 7 com adapter PostgreSQL
+- PostgreSQL 17
 - Swagger/OpenAPI
 - Testes nativos com `node:test`
 
 ## Pré-requisitos
 
-- Node.js 24.x
-- npm compatível com a versão do Node.js
-- PostgreSQL 17 ou compatível, local ou por Docker Desktop com Docker Compose
-- Git para versionamento
+Instale Node.js 24.x, npm compatível e Docker com Docker Compose (ou disponibilize PostgreSQL 17). O banco usado nos testes de integração deve ser dedicado e ter `test` no nome. Não aponte testes para o banco de desenvolvimento.
 
-Docker é uma opção, não a única: quem não tiver Docker pode usar uma instalação local do PostgreSQL. Nesse caso, ajuste `DATABASE_URL` no `.env` para as credenciais e o banco locais.
+## Preparar o ambiente local
 
-## Iniciar localmente
+1. Copie `.env.example` para `.env` e ajuste os valores para o seu ambiente. Use um `JWT_SECRET` local com pelo menos 32 caracteres aleatórios. Não compartilhe nem versione `.env`.
+2. Instale as dependências e confira a versão do Node:
 
-1. Na raiz do projeto, copie `.env.example` para `.env`:
-   ```powershell
-   Copy-Item .env.example .env
-   ```
-2. Edite `.env`: confirme `DATABASE_URL` e substitua `JWT_SECRET` por uma chave aleatória com pelo menos 32 bytes. Nunca use o valor de exemplo como segredo definitivo.
-3. Instale dependências. Na primeira instalação, use `npm install`; depois que `package-lock.json` estiver versionado, prefira `npm ci`.
-4. Valide o schema e compile:
    ```bash
-   npm run prisma:validate
-   npm run build
+   node -v
+   npm ci
+   npm ls --depth=0
    ```
-5. Inicie PostgreSQL. Com Docker:
+
+3. Inicie o PostgreSQL de desenvolvimento com Docker Compose, se for usar essa opção:
+
    ```bash
    docker compose up -d postgres
    docker compose ps
    ```
-   Se usar PostgreSQL instalado localmente, inicie o serviço do banco pelo mecanismo do seu sistema operacional.
-6. Aplique a migração de desenvolvimento:
+
+4. Valide o Prisma, gere o cliente e compile a aplicação:
+
    ```bash
-   npm run db:migrate
+   npm run prisma:validate
+   npm run prisma:generate
+   npm run build
    ```
-   Se o Prisma indicar divergência de schema/migração ou sugerir reset, pare e revise o diagnóstico; não aceite reset destrutivo sem verificar os dados e a migração.
-7. Opcionalmente configure `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_NAME` e `BOOTSTRAP_ADMIN_PASSWORD` no `.env`. A senha inicial precisa ter pelo menos 12 caracteres. Não há senha padrão.
-8. Prepare os parâmetros globais e, quando as três variáveis de bootstrap forem configuradas, o primeiro Administrador:
-   ```bash
-   npm run db:seed
-   ```
-9. Inicie a API:
+
+5. Confira se `DATABASE_URL` aponta para o banco correto antes de aplicar migrações. Para desenvolvimento, use `npm run db:deploy` e depois `npm run db:seed`. Se o Prisma apontar divergência, investigue antes de qualquer ação destrutiva; não faça reset automático.
+6. Para criar o primeiro Administrador, configure explicitamente `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_NAME` e `BOOTSTRAP_ADMIN_PASSWORD`. O seed não define uma senha padrão e preserva credenciais já existentes.
+7. Inicie a API:
+
    ```bash
    npm run dev
    ```
 
-A API fica disponível em `http://127.0.0.1:3000/health`; o Swagger fica em `/docs` e o documento OpenAPI em `/docs/json`.
+A API disponibiliza `GET /health`. A interface Swagger fica em `/docs` e o documento OpenAPI em `/docs/json`.
 
-## Scripts disponíveis
+## Comandos principais
 
-| Comando | Objetivo |
+| Comando | Para que serve |
 |---|---|
-| `npm run dev` | Iniciar servidor com recarga durante o desenvolvimento |
-| `npm run build` | Gerar Prisma Client e compilar TypeScript |
-| `npm test` | Executar build e testes existentes |
-| `npm run prisma:validate` | Validar o schema Prisma |
-| `npm run prisma:generate` | Gerar Prisma Client |
-| `npm run db:migrate` | Criar/aplicar migrações de desenvolvimento |
-| `npm run db:deploy` | Aplicar migrações já versionadas no ambiente alvo |
-| `npm run db:seed` | Executar seed explicitamente |
-| `npm run db:studio` | Abrir Prisma Studio |
+| `npm run dev` | Inicia o servidor em modo de desenvolvimento |
+| `npm run build` | Gera o Prisma Client e compila TypeScript |
+| `npm test` | Executa build e testes unitários/HTTP |
+| `npm run prisma:validate` | Valida o schema Prisma |
+| `npm run prisma:generate` | Gera o Prisma Client |
+| `npm run db:deploy` | Aplica migrações versionadas |
+| `npm run db:seed` | Prepara os dados iniciais; pode ser executado novamente |
+| `npm run test:integration` | Executa testes que dependem de PostgreSQL dedicado |
 
-O seed não deve ser tratado como criação automática de credenciais: sem as três variáveis `BOOTSTRAP_ADMIN_*`, ele prepara os parâmetros globais, mas não cria um Administrador.
+Antes de `npm run test:integration`, confira se o `.env` aponta para um banco de teste isolado. A suíte verifica o nome do banco para reduzir o risco de executar testes no banco de desenvolvimento.
 
-## Estrutura do projeto
+## Como o código está organizado
+
+As responsabilidades seguem o fluxo `Routes → Controllers → Services → Repositories → Prisma → PostgreSQL`.
 
 ```text
 src/
-├── app.ts                         # Fastify, Swagger, erros e /health
-├── server.ts                      # Inicialização e encerramento gracioso
-├── config/env.ts                  # Validação de ambiente
-├── infrastructure/database/       # Fábrica do Prisma Client
-├── controllers/                   # Camada HTTP (a desenvolver)
-├── services/                      # Regras de negócio (a desenvolver)
-├── repositories/                  # Persistência encapsulada (a desenvolver)
-└── tests/                         # Testes da fundação
-
-prisma/
-├── schema.prisma                  # Modelo de persistência
-├── migrations/                    # Migrações SQL versionadas
-└── seed.ts                        # Parâmetros e bootstrap explícito
-
-docs/
-├── README.md                      # Índice documental
-├── visao-geral-e-escopo.md
-├── arquitetura-e-padroes.md
-├── modelo-de-dados.md
-├── regras-de-negocio.md
-├── seguranca-e-rbac.md
-├── contrato-api-rest.md
-├── epicos-e-user-stories.md
-├── testes-e-criterios-de-aceite.md
-├── plano-de-implementacao.md
-├── 10-matriz-de-rastreabilidade.md
-├── adr/                           # Decisões arquiteturais/de domínio
-└── referencias/                   # Planejamento histórico pré-decisão
+├── app.ts                         # Fastify, OpenAPI, health e tratamento de erros
+├── server.ts                      # Inicialização e encerramento do servidor
+├── config/                        # Ambiente e bootstrap administrativo
+├── infrastructure/database/       # Prisma Client centralizado
+├── modules/
+│   ├── auth/                      # Login, JWT, logout e sessões
+│   ├── usuarios/                  # Gestão de usuários e permissões
+│   ├── organizacoes/              # Organizações e CNPJ
+│   ├── contratos/                 # Vigência, renovação e histórico
+│   ├── lotes/                     # Ciclo operacional e triagem simplificada
+│   ├── equipamentos/              # Cadastro, estados e ativação
+│   ├── movimentacoes/             # Registro e histórico de movimentação
+│   ├── auditoria/                 # Eventos e consulta de auditoria
+│   ├── relatorios/                # Indicadores operacionais/financeiros básicos
+│   └── parametros/                # Parâmetros globais
+├── shared/                        # Erros de domínio, paginação e autorização
+└── tests/                         # Testes unitários, HTTP, arquitetura e integração
 ```
 
-A arquitetura normativa é **Controller → Service → Repository**. Controllers não acessam Prisma diretamente; services aplicam regras, autorização e transações; repositories encapsulam consultas e escritas. As pastas estão preparadas, mas os fluxos de negócio ainda precisam ser implementados.
+As decisões de domínio, permissões e formatos de resposta estão documentados em `docs/`. Comece por [`docs/README.md`](docs/README.md). Para entender o que já foi testado e o que ainda falta, consulte [`docs/homologacao-av2.md`](docs/homologacao-av2.md) e [`docs/relatorio-final-av2.md`](docs/relatorio-final-av2.md).
 
-## Documentação normativa
+## Segurança básica
 
-Toda a documentação do projeto fica em `docs/`. Comece por [`docs/README.md`](docs/README.md), o índice canônico.
+A API define os papéis `ADMINISTRADOR`, `OPERADOR_CADASTRO`, `GESTOR_ALMOXARIFADO` e `AUDITOR`. As senhas novas são armazenadas com bcrypt; os JWT têm validade de 30 minutos e consideram usuário ativo, versão de autenticação e revogação do token. Rotas protegidas não devem expor hashes, tokens ou segredos.
 
-| Documento | Conteúdo |
-|---|---|
-| [01 — Visão geral e escopo](docs/visao-geral-e-escopo.md) | Objetivo, limites e regras herdadas da AV1 |
-| [02 — Arquitetura e padrões](docs/arquitetura-e-padroes.md) | Camadas, configuração e padrões técnicos |
-| [03 — Modelo de dados](docs/modelo-de-dados.md) | Entidades, relacionamentos, tipos e enums |
-| [04 — Regras de negócio](docs/regras-de-negocio.md) | Validações, transições, contratos, movimentações e cálculos |
-| [05 — Segurança e RBAC](docs/seguranca-e-rbac.md) | JWT, senhas, papéis e matriz de permissões |
-| [06 — Contrato REST](docs/contrato-api-rest.md) | Rotas planejadas, payloads, paginação e erros HTTP |
-| [07 — Épicos e User Stories](docs/epicos-e-user-stories.md) | 9 épicos, 41 US e critérios de aceite |
-| [08 — Testes e aceite](docs/testes-e-criterios-de-aceite.md) | Estratégia e requisitos de verificação |
-| [09 — Plano de implementação](docs/plano-de-implementacao.md) | Marcos e estado atual |
-| [10 — Matriz de rastreabilidade](docs/10-matriz-de-rastreabilidade.md) | Relação entre requisitos, decisões, documentos, US, código e testes |
-| [ADR-0001 — Fundação técnica](docs/adr/ADR-0001-fundacao-tecnica.md) | Stack e arquitetura aprovadas |
-| [ADR-0002 — Decisões de domínio](docs/adr/ADR-0002-decisoes-dominio.md) | Decisões de negócio aprovadas |
+Não use credenciais locais de teste em outros ambientes. Não publique valores de `.env`, tokens de acesso ou senhas em issues, commits ou mensagens.
 
-### Hierarquia e rastreabilidade
+## Situação dos testes
 
-- O PDF da AV2 define o escopo obrigatório da atividade.
-- A AV1 fornece regras de domínio herdadas, não a arquitetura nem a persistência.
-- As decisões aprovadas são consolidadas nos ADRs e nos documentos numerados.
-- Os documentos em `docs/referencias/planejamento-pre-decisao/` são históricos; se divergirem dos ADRs aprovados, prevalecem os ADRs.
-- A matriz de rastreabilidade conecta requisitos e decisões às US e às evidências de código/teste, separando o que está documentado do que foi realmente implementado ou validado.
+Na execução local registrada em 23/10/2026:
 
-## Segurança
+- Prisma validado e cliente gerado; build concluído.
+- `npm test`: **25 testes aprovados, 0 falhas**.
+- `npm run test:integration`: **10 testes aprovados, 0 falhas**.
+- Migrações aplicadas/atualizadas no banco de teste e seed executado duas vezes.
+- Fluxo manual de login, `/auth/me`, logout e recusa do token revogado passou.
+- `git diff --check` terminou sem apontar problemas.
 
-- Nunca versionar `.env`, senhas, hashes, tokens ou dados de execução.
-- Não existe senha padrão administrativa.
-- `BOOTSTRAP_ADMIN_*` só deve ser configurado intencionalmente para provisionar o primeiro Administrador.
-- Senhas novas usam bcrypt; a API usa JWT com validade de 30 minutos e revogação persistida por `jti` conforme a especificação aprovada.
-- Não registrar credenciais, JWT completo, `JWT_SECRET` ou `DATABASE_URL` em logs ou auditoria.
-
-## Estado de validação
-
-| Verificação | Estado conhecido | Observação |
-|---|---|---|
-| `npm install` | Executado com sucesso | Dependências instaladas no ambiente local do responsável |
-| `npm run prisma:validate` | Passou | Prisma validou `prisma/schema.prisma` |
-| `npm run build` | Passou | Prisma Client gerado e TypeScript compilado sem erros reportados |
-| Migração PostgreSQL | Pendente | Requer PostgreSQL em execução |
-| `npm test` | Pendente | Ainda não há resultado de execução confirmado nesta etapa |
-| `npm run db:seed` | Pendente | Executar após conectar/aplicar a migração no banco |
-| Autenticação, RBAC e endpoints de negócio | Não implementados ainda | Planejados nas US da documentação |
-
-## Matriz de rastreabilidade
-
-A matriz não declara uma User Story concluída apenas porque possui documentação. O estado de implementação e validação deve ser atualizado com evidências reais.
-
-Consulte [`docs/10-matriz-de-rastreabilidade.md`](docs/10-matriz-de-rastreabilidade.md).
+A matriz completa de RBAC, concorrência, rollback em todos os fluxos críticos, cobertura das regras de fronteira e CI remota ainda precisam de verificação. Também permanece um aviso de depreciação do Fastify sobre `disableRequestLogging`; ele não impediu os testes, mas deve ser atualizado.

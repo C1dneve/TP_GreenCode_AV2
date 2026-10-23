@@ -1,0 +1,2 @@
+import { RelatoriosService } from "./relatorios.service.js";
+export class RelatoriosController { constructor(private readonly service: RelatoriosService) {} operacionais(q: any, actorRole: string) { return this.service.operacionais(q, actorRole); } triagem(q: any, actorRole: string) { return this.service.triagem(q, actorRole); } financeiros(q: any, actorRole: string) { return this.service.financeiros(q, actorRole); } }

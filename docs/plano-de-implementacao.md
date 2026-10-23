@@ -1,27 +1,58 @@
 # Plano de implementação — GreenCode AV2
 
-## Estado atual
+## Estado em 23/10/2026
 
-- [x] Escopo `ENT1-A` aprovado.
-- [x] Recomendações ER/NEG/SEG/REST aprovadas sem exceções.
-- [x] Triagem simplificada da AV1 confirmada.
-- [x] Documentação de arquitetura, dados, regras, RBAC, REST, US e matriz preparada.
-- [x] `npm install`, `npm run prisma:validate` e `npm run build` executados com sucesso no ambiente do responsável.
-- [ ] Validar migração contra PostgreSQL.
-- [ ] Executar seed e `npm test`.
-- [ ] Implementar autenticação JWT, revogação e RBAC.
-- [ ] Implementar repositories, services e endpoints de negócio.
+A API foi organizada em módulos para autenticação, usuários, organizações, contratos, lotes, equipamentos, movimentações, auditoria, relatórios e parâmetros. O build, os testes automatizados executados e o teste manual de revogação passaram no ambiente local. Agora o foco é fechar a documentação, revisar as alterações e verificar a CI remota antes de ampliar a cobertura dos casos de negócio.
 
-## Próxima sequência
+## Feito e verificado
 
-1. Disponibilizar PostgreSQL local ou Docker Desktop.
-2. Corrigir a divergência documentada de nulabilidade de `Equipamento.loteId`/posição antes de homologar a migração.
-3. Aplicar a migração em banco vazio; se o Prisma sugerir reset ou divergência inesperada, parar e revisar antes de confirmar.
-4. Executar seed e testes; registrar resultados reais na matriz.
-5. Implementar autenticação, usuários e RBAC antes de abrir as rotas de negócio protegidas.
-6. Implementar organizações/contratos; depois lotes/equipamentos/triagem; em seguida movimentações, auditoria, relatórios e parâmetros.
-7. Fechar com testes de integração, jornada ponta a ponta, OpenAPI, CI e documentação.
+- [x] Revisão do escopo, das regras de domínio e das decisões arquiteturais.
+- [x] Separação dos módulos em rotas, controllers, services e repositories.
+- [x] Testes de arquitetura para impedir acesso direto ao Prisma nas camadas HTTP e dependência HTTP nos services.
+- [x] Validação do schema e geração do Prisma Client.
+- [x] Build TypeScript concluído.
+- [x] `npm test`: 25 testes aprovados, sem falhas.
+- [x] `npm run test:integration`: 10 testes aprovados, sem falhas.
+- [x] Migrações aplicadas/atualizadas no banco de teste e `prisma migrate status` sem migrações pendentes.
+- [x] Seed executado duas vezes; a conta Administrador existente foi preservada e os defaults globais foram verificados.
+- [x] Jornada HTTP de organização → contrato → lote → equipamento → triagem → movimentação executada pela integração.
+- [x] Login, `/auth/me`, logout e recusa do token revogado confirmados manualmente.
+- [x] `git diff --check` terminou sem mensagens.
+- [x] Identificadas e removidas no pacote de revisão cópias documentais redundantes.
 
-## Regra de atualização
+## Pendências antes da entrega
 
-Depois de cada incremento, atualizar esta página e `10-matriz-de-rastreabilidade.md` com a evidência realmente executada. Não marcar história como concluída com base apenas na existência de documentação ou código sem teste correspondente.
+- [ ] Revisar `git diff` e `git status --short` para confirmar o escopo do commit e excluir segredos/temporários.
+- [ ] Commitar e enviar a branch de trabalho para o GitHub.
+- [ ] Conferir a CI remota após o push.
+- [ ] Completar a matriz RBAC por endpoint e papel.
+- [ ] Cobrir JWT expirado, conta desativada, troca de senha, último Administrador e invalidação global de sessões.
+- [ ] Testar concorrência e `versaoEsperada` nos recursos mutáveis, especialmente contratos simultaneamente vigentes.
+- [ ] Testar limites de data, lote vazio, transições inválidas e justificativas obrigatórias.
+- [ ] Testar rollback das mutações quando falha o registro de auditoria ou a triagem.
+- [ ] Conferir cálculos e relatórios com dados persistidos; aumentar a cobertura de filtros e paginação.
+- [ ] Atualizar o aviso de depreciação do Fastify relacionado a `disableRequestLogging`.
+
+## Como repetir a validação local
+
+Use Node.js 24.x, dependências do lockfile e PostgreSQL de teste dedicado. Confirme a URL do banco antes de aplicar migrações ou executar testes:
+
+```powershell
+npm ci
+npm ls --depth=0
+npm run prisma:validate
+npm run prisma:generate
+npm run build
+npm run db:deploy
+npm run db:seed
+npm run db:seed
+npm test
+npm run test:integration
+git diff --check
+```
+
+Os resultados já registrados estão em `relatorio-final-av2.md`; o roteiro `homologacao-av2.md` explica o que observar em cada etapa.
+
+## Regra de acompanhamento
+
+A presença de código ou de um teste no repositório não equivale a aprovação. Marque um requisito como validado somente depois que o cenário correspondente for executado e passar. A evidência local atual não substitui a CI remota nem os testes complementares listados neste plano.

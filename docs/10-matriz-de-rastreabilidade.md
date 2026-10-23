@@ -1,106 +1,67 @@
-# 10 — Matriz de rastreabilidade
+# Matriz de rastreabilidade — GreenCode AV2
 
-**Versão:** 1.0  
-**Data de referência:** 21/10/2026  
-**Escopo aprovado:** ENT1-A; recomendações ER/NEG/SEG/REST aceitas sem exceções; triagem simplificada da AV1.
+**Atualizada em:** 23/10/2026. Esta matriz diferencia o que passou nas verificações executadas do que ainda tem cobertura incompleta. Código presente ou teste escrito não equivale a requisito totalmente homologado.
 
-## 1. Objetivo
+## Legenda
 
-Esta matriz liga os requisitos e decisões da AV2 às fontes documentais, ADRs, regras de negócio, épicos/User Stories e evidências de implementação/teste. Ela existe para permitir responder:
+- **Validado no recorte atual:** o teste ou comando relacionado foi executado e passou.
+- **Parcial:** há evidência positiva, mas ela não cobre todos os cenários do requisito.
+- **Pendente:** ainda falta evidência de execução apropriada.
 
-1. De onde vem o requisito?
-2. Onde a decisão foi formalizada?
-3. Qual US implementa o requisito?
-4. Em que parte do projeto deve existir a implementação?
-5. Qual evidência prova que está concluído?
+## Rastreabilidade de requisitos
 
-**Regra de rastreabilidade:** documentação aprovada não é evidência de implementação. Uma linha só deve ser marcada como validada quando houver comando/teste executado ou evidência verificável correspondente.
-
-## 2. Legenda dos estados
-
-| Estado | Significado |
-|---|---|
-| **DOC** | Decisão/regra documentada e consolidada |
-| **CODE-PARCIAL** | Parte da fundação/camada existe, mas falta o fluxo funcional completo |
-| **PENDENTE** | Implementação ainda não realizada |
-| **VALIDAÇÃO-PENDENTE** | Código preparado, mas migração/teste/runtime ainda não foi executado ou confirmado |
-| **VALIDADO** | Teste ou verificação pertinente foi executado e passou; registrar evidência |
-
-Os estados abaixo refletem apenas evidências conhecidas em 21/10/2026. Não presumir estado verde da CI ou do banco.
-
-## 3. Rastreabilidade de requisitos
-
-| ID | Requisito / decisão rastreada | Fonte / documentos normativos | ADR / regra | Épico e US | Implementação esperada | Evidência e estado conhecido |
-|---|---|---|---|---|---|---|
-| RT-001 | Monólito HTTP Fastify, TypeScript e endpoints JSON | AV2.pdf; `visao-geral-e-escopo.md`; `arquitetura-e-padroes.md` | ADR-0001 | E0: US-AV2-001 a 004 | `src/app.ts`, `src/server.ts`, rotas e controllers | `/health`/Swagger estão estruturados; build local passou. **CODE-PARCIAL** |
-| RT-002 | Configuração por ambiente, sem segredos no Git | `arquitetura-e-padroes.md`; `seguranca-e-rbac.md` | ADR-0001; SEG | US-AV2-001, 004 | `src/config/env.ts`, `.env.example`, `.gitignore`, `prisma.config.ts` | `npm run build` passou com `.env` presente. Revisar `.env` nunca versionado. **CODE-PARCIAL** |
-| RT-003 | Controller → Service → Repository; controller não acessa Prisma | `arquitetura-e-padroes.md` | ADR-0001 | US-AV2-002 | `src/controllers/`, `src/services/`, `src/repositories/` | Estrutura preparada; serviços/repos funcionais ainda não implementados. **PENDENTE** |
-| RT-004 | Schema relacional com entidades centrais e transversais | `modelo-de-dados.md` | ADR-0002 | E1: US-AV2-005, 007, 009 | `prisma/schema.prisma` | `prisma validate` e `prisma generate` passaram localmente. Migração ainda não aplicada. **VALIDAÇÃO-PENDENTE** |
-| RT-005 | Migrações versionadas e banco reproduzível | `arquitetura-e-padroes.md`; `testes-e-criterios-de-aceite.md`; `plano-de-implementacao.md` | ADR-0001 | US-AV2-006, 040, 041 | `prisma/migrations/`, script `db:migrate`, serviço PostgreSQL na CI | PostgreSQL/Docker indisponível na máquina no último checkpoint; migração ainda sem validação real. **VALIDAÇÃO-PENDENTE** |
-| RT-006 | Seed repetível e bootstrap explícito do primeiro Administrador | `modelo-de-dados.md`; `seguranca-e-rbac.md` | ADR-0002 | US-AV2-008, 014 | `prisma/seed.ts` | Código do seed existe, mas não foi executado contra banco. **VALIDAÇÃO-PENDENTE** |
-| RT-007 | Login bcrypt, JWT 30 min, usuário ativo e `jti` revogável | `seguranca-e-rbac.md`; `contrato-api-rest.md` | ADR-0002; SEG | E2: US-AV2-010, 011, 012, 015 | Plugin JWT, services/repos de usuário e `TokenRevogado`, rotas `/api/v1/auth/*` | Login/logout e middleware ainda não implementados. **PENDENTE** |
-| RT-008 | Autorização por quatro papéis e matriz RBAC | `seguranca-e-rbac.md`; `contrato-api-rest.md` | ADR-0002 | US-AV2-013 e critérios de todas as US protegidas | hooks/guards e políticas por rota/service | Não há teste de permitido/negado confirmado. **PENDENTE** |
-| RT-009 | CNPJ normalizado, DV validado e único; cadastro de organização | `modelo-de-dados.md`; `regras-de-negocio.md`; `contrato-api-rest.md` | ADR-0002; NEG1 | E3: US-AV2-016 a 019 | `OrganizacaoRepository`, service, controller/rotas, índice único no schema | Modelo existe; regra de serviço/endpoints ainda não existem. **PENDENTE** |
-| RT-010 | Histórico de contratos 1:N, vigência derivada, renovação transacional e no máximo um vigente | `modelo-de-dados.md`; `regras-de-negocio.md`; `contrato-api-rest.md` | ADR-0002; NEG2 | E4: US-AV2-020 a 023 | `ContratoRepository/Service`, transações e serialização da criação/renovação | Modelo existe; caso de uso e proteção contra concorrência ainda pendentes. **PENDENTE** |
-| RT-011 | Lote ligado a organização ativa; data de entrada não futura nem anterior a 90 dias | `regras-de-negocio.md`; `contrato-api-rest.md` | ADR-0002; NEG3 | E5: US-AV2-024, 025 | `LoteService` e endpoints de lote | Sem service/endpoint funcional. **PENDENTE** |
-| RT-012 | Triagem simplificada e transação de lote/equipamentos; sequência operacional controlada | `regras-de-negocio.md`; `epicos-e-user-stories.md`; `testes-e-criterios-de-aceite.md` | ADR-0002; NEG4 | US-AV2-026, 027 | operação de triagem em `LoteService`, atualização conjunta e testes de rollback | Regra aprovada/documentada; operação não implementada. **PENDENTE** |
-| RT-013 | Vínculo de equipamento removível apenas antes do processamento/rastreabilidade | `modelo-de-dados.md`; `regras-de-negocio.md` | ADR-0002; NEG4 | US-AV2-028 | `loteId`/posição, índices e serviço de vínculo | **Divergência conhecida:** schema inicial exige `loteId`; alinhar nulabilidade/índice antes da migração homologada. **VALIDAÇÃO-PENDENTE** |
-| RT-014 | Equipamento: código interno único, ano, peso/valor, estado físico e status | `modelo-de-dados.md`; `regras-de-negocio.md`; `contrato-api-rest.md` | ADR-0002; NEG5 | E6: US-AV2-029 a 033 | `EquipamentoService`, repositório, rotas, constraints | Parte dos campos/índices existe no schema; geração de código e regras de domínio ainda não implementadas. **CODE-PARCIAL** |
-| RT-015 | Mudança de rastreamento sempre justificada; queda física de duas categorias exige justificativa | `regras-de-negocio.md`; `testes-e-criterios-de-aceite.md` | ADR-0002; NEG5 | US-AV2-031, 040 | service de transição de estado, auditoria e testes de fronteira | Documentado, sem execução funcional/teste confirmado. **PENDENTE** |
-| RT-016 | Movimentação imutável, responsável autenticado, origem do histórico e instante do servidor | `modelo-de-dados.md`; `regras-de-negocio.md`; `contrato-api-rest.md` | ADR-0002; NEG6 | E7: US-AV2-034, 035 | `MovimentacaoRepository/Service`, endpoint aninhado e transação | Modelo existe; rotas/service/testes pendentes. **CODE-PARCIAL** |
-| RT-017 | Auditoria de mutações e segurança, sem segredos; evento correlacionado em transação | `regras-de-negocio.md`; `seguranca-e-rbac.md`; `testes-e-criterios-de-aceite.md` | ADR-0002 | E8: US-AV2-036, 040 | `EventoAuditoria` repository/service e chamadas transacionais | Modelo existe, mas nenhuma instrumentação completa das mutações foi implementada. **CODE-PARCIAL** |
-| RT-018 | Relatórios operacionais, triagem e financeiro simplificável; defaults 0% e 15% | `visao-geral-e-escopo.md`; `regras-de-negocio.md`; `contrato-api-rest.md` | ADR-0002; NEG10 | E8: US-AV2-037, 038 | services/rotas de relatórios e parâmetros | Modelo/seed de parâmetro preparados; relatórios e atualização autorizada ainda não implementados. **CODE-PARCIAL** |
-| RT-019 | Contrato REST: envelopes, paginação, erros HTTP e OpenAPI | `arquitetura-e-padroes.md`; `contrato-api-rest.md` | ADR-0001; REST | E0/E8: US-AV2-003, 039 | schemas Fastify por rota, handlers de erro, Swagger | Fundação Swagger e handler existem; contrato completo de rotas de negócio ainda ausente. **CODE-PARCIAL** |
-| RT-020 | Concorrência otimista por `versaoEsperada` e `versao` | `modelo-de-dados.md`; `regras-de-negocio.md`; `contrato-api-rest.md` | ADR-0002; NEG/REST | US-AV2-018, 022, 025, 030, 031, 038, 040 | atualização condicional nos repositories/services e resposta `409` | Campos de versão estão previstos no schema; mecanismo de atualização e testes pendentes. **CODE-PARCIAL** |
-| RT-021 | Testes unitários, integração, RBAC e jornada ponta a ponta | `testes-e-criterios-de-aceite.md` | ADR-0001/0002 | US-AV2-040 | `src/tests/`, banco de teste, CI | Testes básicos estão escritos, mas `npm test` e integração PostgreSQL não têm resultado confirmado. **VALIDAÇÃO-PENDENTE** |
-| RT-022 | README, OpenAPI, ADRs, migração/seed e homologação documentados | `visao-geral-e-escopo.md`; `testes-e-criterios-de-aceite.md`; `plano-de-implementacao.md` | ADR-0001/0002 | US-AV2-039, 041 | README, `docs/`, `.github/workflows/ci.yml`, lockfile | Documentação canônica preparada; `package-lock.json` deve ser versionado e workflow migrado para `npm ci` antes de declarar CI reproduzível. **CODE-PARCIAL** |
-
-## 4. Rastreabilidade entre arquivos de documentação
-
-Esta tabela responde quais arquivos são fonte, quais aprofundam o assunto e quais transformam a decisão em backlog/evidência.
-
-| Documento | Fonte / depende de | Desdobra em / relacionado a | Uso principal |
+| ID | Requisito/decisão | Código principal | Estado e evidência atual |
 |---|---|---|---|
-| `docs/README.md` | AV2, decisões aprovadas | Todos os documentos listados abaixo | Índice, precedência e entrada única |
-| `visao-geral-e-escopo.md` | PDF AV2; regras herdadas AV1; decisão ENT1-A | `02`, `07`, `09`, ADR-0002 | Delimitar o que entra e o que não entra |
-| `arquitetura-e-padroes.md` | AV2 e ADR-0001 | `06`, `08`, `09`; US 001–009 e 039–041 | Responsabilidades técnicas e fluxo de dependência |
-| `modelo-de-dados.md` | AV1 (entidades) e decisões ER | `04`, `05`, `06`, ADR-0002; US 005–009 e US de domínio | Schema, relações, índices e integridade |
-| `regras-de-negocio.md` | AV1 e decisões NEG | `06`, `07`, `08`; US 016–038 | Comportamento esperado de cada caso de uso |
-| `seguranca-e-rbac.md` | AV1 e decisões SEG/RBAC | `06`, `07`, `08`; US 010–015 e permissões das US protegidas | Autenticação e autorização por papel |
-| `contrato-api-rest.md` | AV2, arquitetura, modelo e RBAC | OpenAPI/rotas futuras, `07`, `08`; US 003 e 039 | Contrato externo verificável |
-| `epicos-e-user-stories.md` | Escopo, modelo, regras, RBAC e API | Código, testes e critérios de aceite | Backlog rastreável da entrega |
-| `testes-e-criterios-de-aceite.md` | Todas as regras e o contrato REST | Testes unitários, integração, API, RBAC e E2E | Como provar cada requisito |
-| `plano-de-implementacao.md` | Priorização e estado real do repositório | Marcos e status refletidos na matriz | Sequência de execução e bloqueios |
-| `10-matriz-de-rastreabilidade.md` | Todos os documentos normativos e estado observado do código | Atualização por incremento/commit | Visão cruzada de requisito, US, implementação e evidência |
-| `adr/ADR-0001-fundacao-tecnica.md` | Requisitos técnicos AV2 | `02`, `06`, `08`, `09` | Decisões estruturais de stack/arquitetura |
-| `adr/ADR-0002-decisoes-dominio.md` | AV1, ER/NEG/SEG/REST, confirmação final | `03`, `04`, `05`, `06`, `07` | Fonte normativa para escolhas aprovadas |
-| `referencias/planejamento-pre-decisao/*` | Documentos de planejamento antes da confirmação | Rastreabilidade histórica apenas | Preservação histórica; não substituem ADRs |
+| RT-001 | Node 24, Fastify 5, Prisma 7, PostgreSQL 17 e monólito modular | `package.json`, `prisma.config.ts`, `src/app.ts` | **Validado no recorte atual:** Node 24.19.0 e PostgreSQL 17.11 usados localmente; build aprovado. |
+| RT-002 | Configuração, `/health`, inicialização e encerramento | `src/config/env.ts`, `src/app.ts`, `src/server.ts` | **Parcial:** testes de configuração e `/health` passaram; encerramento gracioso precisa de cenário dedicado. |
+| RT-003 | Validação de payload, erros uniformes, request ID e OpenAPI | `src/app.ts`, rotas dos módulos | **Validado no recorte atual:** testes de envelope de erro, health, Swagger UI e `/docs/json` passaram; cobertura completa de schemas não está provada. |
+| RT-004 | Rotas/controllers sem Prisma direto e services desacoplados do Fastify | `src/modules/*` | **Validado no recorte atual:** testes de arquitetura passaram. |
+| RT-005 | Schema relacional, FKs, unicidade, índices e enums | `prisma/schema.prisma`, `prisma/migrations/*` | **Parcial:** validação Prisma e testes PostgreSQL passaram para as constraints específicas cobertas; não representa todas as combinações do modelo. |
+| RT-006 | Migrações versionadas, seed repetível, defaults e bootstrap explícito | `prisma/migrations/*`, `prisma/seed.ts` | **Validado no recorte atual:** deploy/status de migrações sem pendências; seed executado duas vezes; defaults 0%/15% conferidos. |
+| RT-007 | bcrypt, JWT de 30 minutos, validação de usuário ativo e claims | `src/modules/auth/*`, `src/app.ts` | **Parcial:** login, credenciais inválidas, papéis em `/auth/me` e tokens ausente/malformado testados; expiração e todas as condições de claims ainda exigem evidência. |
+| RT-008 | Logout com revogação e invalidação de sessões por `authVersion` | `src/modules/auth/*`, `src/modules/usuarios/*` | **Parcial:** logout seguido de reutilização do mesmo JWT resultou em HTTP 401; troca de senha e invalidação global ainda precisam de testes dedicados. |
+| RT-009 | Quatro papéis e matriz de RBAC | rotas e services em `src/modules/*` | **Parcial:** testes cobrem `/auth/me`, áreas administrativas e autorização nos services; a matriz completa para todos os endpoints continua pendente. |
+| RT-010 | Gestão de usuários, proteção ao último Administrador e autodesativação | `src/modules/usuarios/*` | **Pendente:** falta evidência específica de todos os invariantes e dos casos concorrentes. |
+| RT-011 | Organizações, CNPJ, busca, paginação, versionamento e inativação | `src/modules/organizacoes/*` | **Parcial:** validação unitária de CNPJ, unicidade no banco e criação na jornada HTTP passaram; filtros, versionamento e bloqueios de inativação precisam de cobertura adicional. |
+| RT-012 | Contratos históricos, vigência única, renovação e cancelamento | `src/modules/contratos/*` | **Parcial:** criação de contrato na jornada HTTP passou; concorrência de vigência, renovação, cancelamento e rollback precisam de testes específicos. |
+| RT-013 | Lotes, janela temporal, estados, bloqueio de lote vazio e versionamento | `src/modules/lotes/*` | **Parcial:** fluxo básico de lote/triagem passou na jornada; limites de data, lote vazio e transições negativas continuam pendentes. |
+| RT-014 | Triagem simplificada transacional | `src/modules/lotes/lotes.service.ts` | **Parcial:** jornada básica de triagem passou; atomicidade e rollback por falha precisam de teste dedicado. |
+| RT-015 | Equipamentos, código único, vínculo lote/posição e persistência | `src/modules/equipamentos/*`, migrações | **Parcial:** jornada HTTP e constraints específicas de código, lote e posição passaram; cenários de atualização/ativação ainda precisam de cobertura. |
+| RT-016 | Estado físico, rastreamento, transições e justificativas | `src/modules/equipamentos/equipamentos.service.ts` | **Pendente:** faltam testes de fronteira para transições e justificativas. |
+| RT-017 | Movimentações append-only e histórico | `src/modules/movimentacoes/*` | **Parcial:** a jornada básica registrou movimentação; autoria, origem/destino e todas as proteções append-only precisam de testes específicos. |
+| RT-018 | Auditoria na mesma transação e consulta protegida | `src/modules/auditoria/*` e repositories | **Pendente:** falta evidência específica de rollback quando a auditoria falha e de todas as permissões de consulta. |
+| RT-019 | Relatórios operacionais, de triagem e financeiros simplificados | `src/modules/relatorios/*` | **Pendente:** resultados precisam ser comparados com dados persistidos e cenários de filtro/consistência. |
+| RT-020 | Parâmetros globais, intervalo de 0–100%, RBAC e auditoria | `src/modules/parametros/*` | **Parcial:** defaults 0%/15% foram confirmados; alterações inválidas, autorização e auditoria requerem testes específicos. |
+| RT-021 | Coleções `{data, meta}`, erros estáveis e OpenAPI | `src/shared/*`, `src/app.ts`, rotas | **Parcial:** OpenAPI e erros básicos passaram; falta confirmar paginação, listas vazias e schemas de todos os recursos. |
+| RT-022 | Testes, documentação, CI e homologação | `src/tests/*`, `.github/workflows/ci.yml`, `docs/*` | **Parcial:** 25 testes unitários/HTTP e 10 de integração passaram localmente; CI remota ainda não foi verificada. |
 
-## 5. Rastreabilidade por épico
+## Situação por épico
 
-| Épico | Escopo | User Stories | Teste/evidência mínima |
+| Épico | User Stories | Evidência atual | Situação |
 |---|---|---|---|
-| E0 — Fundação HTTP, configuração e arquitetura | Servidor, camadas, erro e ambiente | US-AV2-001–004 | Build, `/health`, OpenAPI e testes de erros/configuração |
-| E1 — Persistência relacional | Schema, migração, client, seed e constraints | US-AV2-005–009 | Validar schema, migrar banco vazio, seed repetível e FKs/uniques |
-| E2 — Autenticação e RBAC | Login, validação JWT, logout, permissões e conta | US-AV2-010–015 | Tokens ausentes/inválidos/expirados/revogados, quatro papéis |
-| E3 — Organizações | CRUD, CNPJ, versionamento e desativação | US-AV2-016–019 | CNPJ inválido/duplicado, versão e bloqueio por lote pendente |
-| E4 — Contratos | Criar, consultar, renovar, cancelar e histórico | US-AV2-020–023 | Vigência, renovação concorrente, cancelamento e histórico preservado |
-| E5 — Lotes | Cadastro, janela de data, triagem e ciclo operacional | US-AV2-024–028 | Lote vazio, datas limite, transições e rollback da triagem |
-| E6 — Equipamentos | Cadastro, código, estados e valores | US-AV2-029–033 | Código único, ano/peso/valor, justificativas e estado permitido |
-| E7 — Movimentações | Registrar e consultar trilha imutável | US-AV2-034–035 | Ator do token, origem do histórico, append-only e RBAC |
-| E8 — Auditoria, relatórios e entrega | Logs de auditoria, parâmetros, OpenAPI, testes e README | US-AV2-036–041 | Auditoria transacional, relatórios, defaults, CI e jornada completa |
+| E0 — Fundação HTTP e arquitetura | US-AV2-001–004 | Build, health, Swagger, erros e testes de arquitetura passaram. | Parcial: falta conferir mais cenários de inicialização/encerramento e contratos. |
+| E1 — Persistência e integridade | US-AV2-005–009 | Prisma, migrações, seed, defaults e constraints específicas passaram. | Parcial: ampliar cobertura de integridade e reversão. |
+| E2 — Autenticação e RBAC | US-AV2-010–015 | Login, papéis, negação de acesso e revogação manual aprovados nos cenários executados. | Parcial: cobertura completa de permissões, usuários desativados, troca de senha e último Administrador. |
+| E3 — Organizações | US-AV2-016–019 | CNPJ e criação na jornada HTTP testados. | Parcial: paginação, concorrência, atualização e desativação. |
+| E4 — Contratos | US-AV2-020–023 | Criação de contrato na jornada HTTP. | Parcial: renovação, cancelamento e concorrência. |
+| E5 — Lotes e triagem | US-AV2-024–028 | Jornada básica de lote e triagem. | Parcial: limites, transições negativas e rollback. |
+| E6 — Equipamentos | US-AV2-029–033 | Cadastro na jornada e constraints de unicidade/relação. | Parcial: demais estados, valores, versionamento e ativação. |
+| E7 — Movimentações | US-AV2-034–035 | Registro de movimentação na jornada HTTP. | Parcial: histórico completo e testes de segurança/imutabilidade. |
+| E8 — Auditoria, relatórios e entrega | US-AV2-036–041 | Defaults, OpenAPI, documentação e suites locais aprovadas. | Parcial: atomicidade de auditoria, relatórios e CI remota. |
 
-## 6. Como manter a matriz atualizada
+## Evidências executadas em 23/10/2026
 
-Após cada incremento:
+- Node `v24.19.0`, npm `11.17.0` e PostgreSQL `17.11` usados na validação local.
+- `npm ci` e `npm ls --depth=0` concluídos; a auditoria do npm reportou zero vulnerabilidades naquela instalação.
+- `npm run prisma:validate`, `npm run prisma:generate` e `npm run build` passaram.
+- `npm test`: 25 aprovados, 0 falhas.
+- `npm run test:integration`: 10 aprovados, 0 falhas.
+- `npm run db:deploy` e `npx prisma migrate status`: três migrações, nenhuma pendente no banco de teste.
+- `npm run db:seed` foi executado duas vezes; uma conta `av2admin` foi encontrada e os parâmetros padrão 0%/15% foram verificados.
+- Login e `/auth/me` passaram antes do logout; após logout, o mesmo token foi recusado com HTTP 401.
+- `git diff --check` não apresentou mensagens.
+- CI remota do GitHub: ainda não verificada após push.
 
-1. Atualize a coluna de evidência com o comando/teste realmente executado.
-2. Mude para `VALIDADO` somente se o teste correspondente passou.
-3. Atualize o status das US em `epicos-e-user-stories.md` ou no rastreador do time quando a US estiver concluída.
-4. Atualize o plano em `plano-de-implementacao.md`.
-5. Se uma decisão mudar, atualize ADR e documentos dependentes no mesmo commit.
-6. Não marque uma rota como concluída só porque aparece na proposta de API; confirme a implementação e o teste.
+## Regra de encerramento
 
-## 7. Critério para encerrar um requisito
-
-Um requisito só é encerrado quando há vínculo explícito com pelo menos uma US, implementação na camada esperada, testes relevantes passando e evidência registrável (saída do teste, CI verde ou validação reproduzível). Para regras críticas, a evidência deve incluir caminho negativo e autorização aplicável.
+Marque uma User Story como validada somente quando houver teste aprovado que cubra o critério relevante. Para concorrência, constraints e transações, use PostgreSQL real. A contagem atual de testes não substitui a cobertura dos cenários que permanecem pendentes. Consulte [`relatorio-final-av2.md`](relatorio-final-av2.md) e [`homologacao-av2.md`](homologacao-av2.md).

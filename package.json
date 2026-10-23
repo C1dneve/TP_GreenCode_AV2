@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "GreenCode AV2 — API REST de logística reversa",
+  "description": "GreenCode AV2 \u2014 API REST de log\u00edstica reversa",
   "engines": {
     "node": ">=24 <25"
   },
@@ -18,7 +18,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
-    "test:integration": "node --test dist/src/tests/integration/database.integration.test.js"
+    "test:integration": "npm run build && node --test dist/src/tests/integration/*.integration.test.js"
   },
   "dependencies": {
     "@fastify/jwt": "^10.2.5",
