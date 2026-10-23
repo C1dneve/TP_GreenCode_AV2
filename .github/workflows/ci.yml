@@ -34,9 +34,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: node -v
       - run: npm ci
-      - run: npm ls --depth=0
       - run: npm run prisma:validate
       - run: npm run prisma:generate
       - run: npm run db:deploy
