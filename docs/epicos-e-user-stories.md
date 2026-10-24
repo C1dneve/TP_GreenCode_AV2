@@ -1,8 +1,8 @@
 # 07 — Épicos e User Stories da AV2
 
-**Escopo aprovado:** `ENT1-A`. P0 é obrigatório para o núcleo da entrega. P1 é complementar/priorizado depois do núcleo; não implica exclusão automática. A triagem permanece simplificada, conforme a confirmação de 20/10/2026.
+**Escopo aprovado:** `ENT1-A`. P0 é parte obrigatória do núcleo da entrega. P1 reúne capacidades complementares priorizadas após o núcleo, mas não está automaticamente excluído. A triagem da AV2 continua simplificada.
 
-**Estado de validação em 23/10/2026:** o build local, 25 testes unitários/HTTP e 10 testes de integração passaram; a jornada HTTP básica de organização, contrato, lote, equipamento, triagem e movimentação também foi executada. Isso ainda não homologa todas as User Stories: a matriz indica os cenários que continuam sem evidência e a CI remota ainda precisa ser conferida após o push.
+**Como ler este documento:** cada US registra o que o sistema deve fazer e como reconhecer o comportamento esperado. Isso descreve o requisito, não significa que ele já foi totalmente testado. Na validação local registrada, 25 testes unitários/HTTP e 10 de integração passaram; as histórias ainda precisam ser verificadas nos cenários que lhes correspondem. A aprovação da CI remota também deve ser conferida separadamente.
 
 ## E0 — Fundação HTTP, configuração e arquitetura
 
@@ -246,6 +246,9 @@ Como responsável pela entrega, quero permitir reprodução e demonstrar o que f
 **Aceite:** README, `.env.example`, ADRs, comandos de instalação/migração/seed/teste/execução; Windows e Ubuntu só marcados como homologados quando existir evidência real.
 
 ## Jornada mínima de demonstração
+
+Esta sequência demonstra o caminho principal, mas não substitui o teste de cada critério de aceite nem os cenários negativos de permissão, concorrência e validação.
+
 
 1. Preparar banco limpo e executar migrações/seed.
 2. Autenticar usuário e verificar um endpoint protegido.
