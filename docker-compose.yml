@@ -1,21 +1,75 @@
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: greencode-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: greencode
-      POSTGRES_PASSWORD: greencode_dev
-      POSTGRES_DB: greencode
-    ports:
-      - "127.0.0.1:5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-greencode}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD no arquivo .env}
+      POSTGRES_DB: ${POSTGRES_DB:-greencode}
     volumes:
       - greencode_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U greencode -d greencode"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 15
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-greencode}:${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD no arquivo .env}@postgres:5432/${POSTGRES_DB:-greencode}?schema=public"
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET no arquivo .env}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:?Configure BOOTSTRAP_ADMIN_USERNAME no arquivo .env}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:?Configure BOOTSTRAP_ADMIN_NAME no arquivo .env}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?Configure BOOTSTRAP_ADMIN_PASSWORD no arquivo .env}
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 15
+      start_period: 30s
+
+  postgres-test:
+    image: postgres:17-alpine
+    profiles: ["tests"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-greencode}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD no arquivo .env}
+      POSTGRES_DB: greencode_test
+    volumes:
+      - greencode_test_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  test-runner:
+    build: .
+    profiles: ["tests"]
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    environment:
+      NODE_ENV: test
+      HOST: 127.0.0.1
+      PORT: 3000
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-greencode}:${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD no arquivo .env}@postgres-test:5432/greencode_test?schema=public"
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET no arquivo .env}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:?Configure BOOTSTRAP_ADMIN_USERNAME no arquivo .env}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:?Configure BOOTSTRAP_ADMIN_NAME no arquivo .env}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?Configure BOOTSTRAP_ADMIN_PASSWORD no arquivo .env}
+    command: ["sh", "-c", "npm run db:deploy && npm run db:seed && npm run test:integration"]
 
 volumes:
   greencode_pgdata:
+  greencode_test_pgdata:
