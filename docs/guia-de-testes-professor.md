@@ -4,40 +4,143 @@ Este guia foi pensado para executar no computador da avaliação. Ele mostra com
 
 ## 1. Preparar e iniciar o projeto
 
-**Pré-requisito:** Docker Desktop instalado e iniciado. Baixe/clonе o repositório completo do GreenCode AV2 e abra o PowerShell na pasta onde estão `docker-compose.yml` e `Dockerfile`.
+Este procedimento foi escrito para um professor que está iniciando o projeto em uma cópia limpa. **Não é necessário instalar Node.js nem PostgreSQL no computador do avaliador**; a execução principal usa Docker Compose.
 
-Crie a configuração local a partir do exemplo:
+### Pré-requisitos
+
+- **Windows 10 ou superior:** Docker Desktop instalado e iniciado. Use PowerShell ou Windows Terminal.
+- **Ubuntu 24.04 ou superior:** Docker Engine e o plugin Docker Compose instalados e funcionando. Use o terminal Bash.
+- O projeto extraído de um ZIP ou clonado do GitHub.
+- Terminal aberto na pasta que contém `Dockerfile` e `docker-compose.yml`.
+
+Os comandos `docker compose` abaixo funcionam tanto no PowerShell quanto no Bash. Somente os passos de criar o `.env`, gerar o segredo JWT e consultar a resposta HTTP têm variantes específicas de cada terminal.
+
+### 1.1 Criar o arquivo local `.env`
+
+**Windows (PowerShell):**
 
 ```powershell
-Copy-Item .env.example .env
-notepad .env
+if (-not (Test-Path .\.env)) { Copy-Item .env.example .env }
 ```
 
-No arquivo `.env`, substitua os valores de exemplo:
+**Ubuntu (Bash):**
 
-- `POSTGRES_PASSWORD`: senha local do banco. Prefira letras, números e `_`, pois ela também será usada na URL de conexão.
-- `JWT_SECRET`: segredo aleatório com pelo menos 32 bytes. No PowerShell, gere um valor com `([guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N"))` e copie o resultado para o arquivo.
-- `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_NAME` e `BOOTSTRAP_ADMIN_PASSWORD`: dados do administrador inicial. A senha precisa ter pelo menos 12 caracteres.
+```bash
+if [ ! -f .env ]; then cp .env.example .env; fi
+```
 
-Esses valores são locais para a avaliação. Não envie o `.env` por e-mail, não o coloque no Git e não o anexe a relatórios.
+Os comandos não sobrescrevem um `.env` que já exista. Os valores do `.env.example` são para avaliação local isolada. Podem ser mantidos para a demonstração, mas nunca devem ser usados em produção nem enviados ao GitHub. Caso altere `POSTGRES_PASSWORD`, prefira letras, números e `_` para evitar dificuldades de codificação na URL de conexão.
 
-Inicie a aplicação e o banco:
+### 1.2 Gerar um segredo JWT aleatório
+
+Gere 32 bytes aleatórios e grave o resultado hexadecimal em `JWT_SECRET`. Use apenas o bloco referente ao seu terminal. Ambos preservam os demais valores do `.env` e não exibem o segredo gerado.
+
+**Windows (PowerShell):**
 
 ```powershell
+$bytes = New-Object byte[] 32
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+$jwtSecret = ([BitConverter]::ToString($bytes) -replace '-', '').ToLowerInvariant()
+$envLines = Get-Content .\.env
+if (-not ($envLines | Where-Object { $_ -match '^JWT_SECRET=' })) { throw 'A linha JWT_SECRET não foi encontrada no .env.' }
+$envLines = $envLines -replace '^JWT_SECRET=.*$', "JWT_SECRET=$jwtSecret"
+Set-Content -Path .\.env -Value $envLines -Encoding ascii
+Write-Host 'JWT_SECRET gerado e gravado no .env; o valor não foi exibido.'
+```
+
+**Ubuntu (Bash):**
+
+```bash
+set -eu
+secret="$(openssl rand -hex 32)"
+grep -q '^JWT_SECRET=' .env || { echo 'A linha JWT_SECRET não foi encontrada no .env.' >&2; exit 1; }
+sed -i "s/^JWT_SECRET=.*/JWT_SECRET=${secret}/" .env
+unset secret
+echo 'JWT_SECRET gerado e gravado no .env; o valor não foi exibido.'
+```
+
+No Ubuntu, o comando usa `openssl`. Caso não esteja instalado, instale-o pelo gerenciador de pacotes da distribuição. O segredo é local: não o compartilhe nem o registre em capturas de tela.
+
+### 1.3 Validar a configuração
+
+Execute no PowerShell ou no Bash:
+
+```shell
+docker compose config -q
+docker compose --profile tests config -q
+```
+
+Os dois comandos devem terminar sem mensagem de erro. Eles validam a configuração, mas ainda não iniciam os containers.
+
+### 1.4 Construir e iniciar a aplicação
+
+Os comandos são iguais nos dois sistemas:
+
+```shell
 docker compose up --build -d
 docker compose ps
-docker compose logs -f api
 ```
 
-Na primeira inicialização, o serviço aguarda o PostgreSQL, aplica as migrações e executa o seed antes de iniciar a API. Quando os logs indicarem que a API está ouvindo, abra:
+Na primeira execução, o Docker baixa as imagens necessárias, constrói a imagem da API, inicia o PostgreSQL, aguarda o banco ficar saudável, aplica as migrações e executa o seed antes de iniciar a API. Aguarde até que `postgres` e `api` estejam com status `healthy`. Se ainda aparecerem como `starting`, aguarde alguns segundos e execute `docker compose ps` novamente.
 
-- `http://localhost:3000/health` — deve responder `200` com `status: "ok"`.
+### 1.5 Verificar a API
+
+**Windows (PowerShell):**
+
+```powershell
+Invoke-RestMethod http://localhost:3000/health
+```
+
+**Ubuntu (Bash):**
+
+```bash
+curl --fail --show-error http://localhost:3000/health
+```
+
+A resposta deve conter `status: ok` e `service: greencode-api`. Abra no navegador:
+
+- `http://localhost:3000/health` — verificação de saúde da API.
 - `http://localhost:3000/docs` — interface Swagger para executar as rotas.
 - `http://localhost:3000/docs/json` — contrato OpenAPI em JSON.
 
-Se a porta 3000 já estiver ocupada, pare o serviço que a utiliza e tente novamente. Se a API não iniciar, consulte `docker compose logs api` e `docker compose logs postgres`.
+### 1.6 Login inicial no Swagger
 
-**Parar e reiniciar:** `docker compose down` para sem apagar os dados. `docker compose down -v` apaga também o banco nos volumes deste Compose; use somente quando desejar recomeçar a avaliação do zero.
+Em uma avaliação com banco novo e valores de demonstração mantidos no `.env`, use em `POST /api/v1/auth/login`:
+
+- **Usuário:** `admin_av2_local`
+- **Senha:** `TroqueEstaSenhaLocal!2026`
+
+Se alterou `BOOTSTRAP_ADMIN_USERNAME` ou `BOOTSTRAP_ADMIN_PASSWORD`, use os valores definidos por você. O seed cria o administrador inicial somente se ele ainda não existir; ele preserva a conta existente e não redefine a senha ao mudar as variáveis.
+
+### 1.7 Logs, parada e reinicialização
+
+Os seguintes comandos funcionam tanto no PowerShell quanto no Bash. Para acompanhar a inicialização:
+
+```shell
+docker compose logs -f api
+```
+
+Se a API não iniciar, consulte os logs dos dois serviços:
+
+```shell
+docker compose logs --tail=100 api
+docker compose logs --tail=100 postgres
+```
+
+Para parar os serviços sem apagar o banco:
+
+```shell
+docker compose down
+```
+
+**Somente se quiser apagar os dados locais e recomeçar a avaliação do zero**, use:
+
+```shell
+docker compose down -v
+```
+
+Esse comando remove os volumes do banco deste Compose. Não o execute se precisar preservar os dados da avaliação. Se recriar o banco, execute novamente `docker compose up --build -d`; o seed criará o administrador com as variáveis atuais.
 
 ## 2. Como testar pelo Swagger
 
@@ -104,7 +207,7 @@ Com a organização ativa, execute `POST /api/v1/organizacoes/{organizacaoId}/co
 }
 ```
 
-Substitua `<data-e-hora-ISO-futura>` por uma data/hora futura no formato ISO 8601. Para gerar uma data válida no PowerShell, execute `(Get-Date).ToUniversalTime().AddYears(1).ToString("o")` e copie o valor para o JSON. Esperado: `201` com status `VIGENTE`. Guarde o `id` como `<contratoId>`.
+Substitua `<data-e-hora-ISO-futura>` por uma data/hora futura no formato ISO 8601. **Windows (PowerShell):** `(Get-Date).ToUniversalTime().AddYears(1).ToString("o")`. **Ubuntu (Bash):** `date -u -d "+1 year" +"%Y-%m-%dT%H:%M:%SZ"`. Copie o valor gerado para o JSON. Esperado: `201` com status `VIGENTE`. Guarde o `id` como `<contratoId>`.
 
 Teste `GET /api/v1/contratos`, `GET /api/v1/contratos/{contratoId}`, `GET /api/v1/organizacoes/{organizacaoId}/contratos` e a consulta aninhada `/api/v1/organizacoes/{organizacaoId}/contratos/{contratoId}`. Devem responder `200` para registros existentes. O contrato aninhado deve retornar `404` se o contrato não pertencer à organização informada.
 
@@ -214,24 +317,61 @@ O Swagger mostra os corpos e os códigos de resposta de cada operação. Use est
 
 As mensagens de erro vêm em JSON, dentro do campo `error`, com um código e uma mensagem. O código HTTP e a regra devem corresponder ao caso testado; não marque como aprovado só porque a API respondeu.
 
-## 6. Testes automatizados opcionais via Docker
+## 6. Testes automatizados e CI
 
-Para rodar apenas os testes unitários/HTTP:
+A validação manual pelo Swagger, descrita acima, é complementar e não substitui a execução automatizada. Os comandos abaixo funcionam no **PowerShell do Windows** e no **Bash do Ubuntu**, sempre executados na raiz do projeto. Não é necessário instalar Node.js nem PostgreSQL diretamente na máquina se você executar os testes pelo Docker Compose.
 
-```powershell
+### 6.1. Testes unitários/HTTP
+
+Execute:
+
+```shell
 docker compose --profile tests run --rm --no-deps test-runner npm test
 ```
 
-Para os testes de integração, que usam um banco isolado com nome contendo `test`:
+O comando executa o script `npm test`, que gera o cliente Prisma, compila o TypeScript e roda os testes unitários/HTTP de `src/tests/`. A opção `--no-deps` evita iniciar o contêiner do PostgreSQL de teste; os testes deste grupo não dependem de uma conexão real com o banco.
 
-```powershell
+### 6.2. Testes de integração HTTP + PostgreSQL
+
+Execute separadamente:
+
+```shell
 docker compose --profile tests run --rm test-runner
 ```
 
-O segundo comando prepara as migrações e o seed do banco de teste antes de executar a suíte de integração. Não altere a URL do banco de testes para apontar para o banco principal de avaliação.
+O serviço `test-runner` aguarda o PostgreSQL de teste ficar saudável, aplica as migrações, executa o seed e roda `npm run test:integration`. Os dados de teste ficam no banco dedicado `greencode_test`. A suíte verifica o nome do banco e não deve ser apontada para o banco principal da avaliação nem para produção.
+
+Os testes críticos incluem:
+
+- **Revogação JWT:** depois de `POST /api/v1/auth/logout`, o mesmo token deve ser rejeitado numa rota protegida com `401`.
+- **Concorrência otimista:** uma atualização com `versaoEsperada` antiga deve receber `409` e não sobrescrever a primeira atualização válida.
+- **Rollback transacional:** uma falha controlada na gravação de auditoria durante a triagem deve reverter as alterações associadas à transação, sem auditoria parcial.
+
+O teste de rollback cria e remove um gatilho temporário apenas no banco de teste; não adiciona ganchos ao código de produção.
+
+Na validação local da versão com as alterações do Dia 1, os resultados observados foram **25 testes unitários/HTTP aprovados, 0 falhas**, e **13 testes de integração aprovados, 0 falhas**. A contagem pode mudar se a suíte for expandida; sempre use o resumo real do comando como evidência.
+
+### 6.3. Teste de fumaça Docker Compose no GitHub Actions
+
+O job `Docker Compose smoke test`, em `.github/workflows/ci.yml`, constrói a imagem da API, inicia PostgreSQL e API com um projeto Compose isolado em runner Ubuntu, aguarda os healthchecks e valida a resposta de `GET /health`. Em caso de falha, coleta logs; ao final, remove os recursos exclusivos daquele job.
+
+Depois de publicar alterações que mudam o workflow, abra a aba **Actions** do GitHub e confira o run do commit correspondente. A existência do job no YAML não significa, por si só, que ele já passou. Esse teste também não substitui as suítes unitária/HTTP e de integração.
+
+### 6.4. Execução direta com Node.js (alternativa)
+
+A execução direta só é necessária para quem tem Node.js 24 e acesso a um PostgreSQL de teste configurado. Use uma base exclusiva cujo nome contenha `test`, configure `DATABASE_URL` e `JWT_SECRET` com valores de teste e execute:
+
+```shell
+npm run prisma:validate
+npm run build
+npm test
+npm run test:integration
+```
+
+`npm run test:integration` exige que o PostgreSQL esteja disponível, que as migrações possam ser aplicadas e que o usuário do banco tenha permissão para criar/remover o gatilho de teste de rollback. Não use credenciais reais.
 
 ## 7. Como registrar a avaliação
 
 Para cada cenário, anote a rota, o papel usado, o resultado esperado, o status HTTP real e `PASSOU` ou `FALHOU`. Um teste passa quando o código HTTP, o conteúdo importante da resposta e a regra de negócio estão corretos.
 
-Os testes automatizados registrados durante o desenvolvimento tiveram 25 aprovações unitárias/HTTP e 10 aprovações de integração. Isso é uma evidência útil, mas não equivale à homologação individual de todas as User Stories. A CI do GitHub deve ser conferida separadamente no repositório.
+Os testes automatizados dão evidência apenas para os cenários executados. Registre o resultado real de cada comando e do run do GitHub Actions correspondente ao commit avaliado; nenhum conjunto de testes substitui a verificação dos critérios de aceite das User Stories. Os nove épicos e as 41 User Stories permanecem descritos integralmente em [Épicos e User Stories](epicos-e-user-stories.md).

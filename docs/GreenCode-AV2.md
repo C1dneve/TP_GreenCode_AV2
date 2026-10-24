@@ -36,7 +36,7 @@ Prisma
 PostgreSQL
 ```
 
-As rotas validam o formato das entradas. Os controllers conectam HTTP aos casos de uso. Os services aplicam as regras de negócio e coordenam transações. Os repositories concentram o acesso aos dados. Isso evita que regras importantes fiquem espalhadas por endpoints diferentes.
+As rotas validam o formato das entradas. Os controllers conectam HTTP aos casos de uso. Os services aplicam as regras de negócio e coordenam transações. Os repositories concentram o acesso aos dados. Isso evita que regras importantes fiquem espalhadas por endpoints diferentes. Os motivos e trade-offs da arquitetura e das escolhas de tecnologia estão formalizados nos [ADRs](adr/README.md).
 
 ### Tecnologias
 
@@ -105,4 +105,6 @@ O administrador inicial é configurado de forma explícita pelas variáveis `BOO
 
 O arquivo [Épicos e User Stories](epicos-e-user-stories.md) descreve o que a AV2 deve fazer e os critérios para aceitar cada história. A existência de uma história ou de código não prova, por si só, que ela foi homologada.
 
-A execução local registrada apresentou 25 testes unitários/HTTP e 10 testes de integração aprovados. Alguns cenários específicos de regras, permissões e transações continuam exigindo evidência própria. O [guia do professor](guia-de-testes-professor.md) dá os passos para executar a aplicação e verificar os principais fluxos no computador de avaliação.
+As evidências automatizadas estão separadas por objetivo: `npm test` executa testes unitários/HTTP; `npm run test:integration` executa testes contra uma base PostgreSQL dedicada; o job `docker-compose-smoke` do [workflow de CI](../.github/workflows/ci.yml) constrói e inicia a API e o banco com Docker Compose e verifica `GET /health`; a execução pelo Swagger é uma validação manual complementar. Os testes de integração recusam uma URL cujo nome de banco não contenha `test`.
+
+A suíte inclui verificações de revogação real de JWT, concorrência otimista com versão obsoleta e rollback da triagem quando a auditoria falha. O teste de rollback instala um gatilho temporário somente na base de teste, verifica lote, equipamento e auditoria e remove o gatilho ao terminar. O [guia do professor](guia-de-testes-professor.md) contém os comandos e ressalvas. Um teste aprovado comprova somente o cenário coberto; não equivale à homologação de todas as 41 User Stories.

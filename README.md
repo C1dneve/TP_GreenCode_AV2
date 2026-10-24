@@ -4,22 +4,94 @@ O GreenCode apoia o controle da logística reversa de equipamentos. Na AV1, o fl
 
 ## Como executar
 
-A forma preparada para avaliação é usar Docker Desktop com Docker Compose. São necessários apenas o repositório e Docker Desktop instalado e iniciado.
+A forma preparada para avaliação é usar Docker Compose. Não é necessário instalar Node.js ou PostgreSQL diretamente no computador do avaliador. Instale e inicie o Docker Desktop no Windows ou o Docker Engine com o plugin Docker Compose no Ubuntu 24.04 ou superior.
 
-1. Copie `.env.example` para `.env`.
-2. Abra `.env` e substitua a senha do PostgreSQL, o segredo JWT e as credenciais do administrador local de avaliação. Não compartilhe esse arquivo.
-3. Na raiz do projeto, execute:
+Abra um terminal na raiz do projeto, onde estão `Dockerfile` e `docker-compose.yml`. Os comandos `docker compose` abaixo são iguais no PowerShell e no terminal do Ubuntu; somente a criação/configuração do arquivo `.env` e a consulta HTTP diferem.
 
-   ```powershell
-   docker compose up --build -d
-   docker compose ps
-   ```
+### 1. Criar o arquivo `.env`
 
-4. Abra `http://localhost:3000/docs` para testar a API ou `http://localhost:3000/health` para conferir se está respondendo.
+**Windows (PowerShell):**
 
-A primeira inicialização cria o banco, aplica as migrações e prepara os parâmetros globais. O administrador inicial é criado com os valores de `BOOTSTRAP_ADMIN_*` somente quando ainda não existe; mudar a variável depois não troca a senha de um usuário já criado.
+```powershell
+if (-not (Test-Path .\.env)) { Copy-Item .env.example .env }
+```
 
-Para acompanhar a inicialização: `docker compose logs -f api`. Para parar sem apagar os dados: `docker compose down`. **Somente para descartar o banco local e recomeçar do zero**, use `docker compose down -v`; esse comando apaga os dados gravados nos volumes desse Compose.
+**Ubuntu (Bash):**
+
+```bash
+if [ ! -f .env ]; then cp .env.example .env; fi
+```
+
+Os valores padrão de `.env.example` destinam-se exclusivamente à avaliação local e podem ser mantidos para uma demonstração isolada. Não os utilize em produção e não compartilhe nem versione `.env`. Se mudar `POSTGRES_PASSWORD`, use letras, números e `_` para evitar problemas de codificação na URL de conexão.
+
+### 2. Gerar um segredo JWT aleatório
+
+Gere um segredo aleatório e grave-o na linha `JWT_SECRET` do `.env`. Escolha o bloco referente ao terminal que está usando.
+
+**Windows (PowerShell):**
+
+```powershell
+$bytes = New-Object byte[] 32
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+$jwtSecret = ([BitConverter]::ToString($bytes) -replace '-', '').ToLowerInvariant()
+$envLines = Get-Content .\.env
+if (-not ($envLines | Where-Object { $_ -match '^JWT_SECRET=' })) { throw 'A linha JWT_SECRET não foi encontrada no .env.' }
+$envLines = $envLines -replace '^JWT_SECRET=.*$', "JWT_SECRET=$jwtSecret"
+Set-Content -Path .\.env -Value $envLines -Encoding ascii
+Write-Host 'JWT_SECRET gerado e gravado no .env; o valor não foi exibido.'
+```
+
+**Ubuntu (Bash):**
+
+```bash
+set -eu
+secret="$(openssl rand -hex 32)"
+grep -q '^JWT_SECRET=' .env || { echo 'A linha JWT_SECRET não foi encontrada no .env.' >&2; exit 1; }
+sed -i "s/^JWT_SECRET=.*/JWT_SECRET=${secret}/" .env
+unset secret
+echo 'JWT_SECRET gerado e gravado no .env; o valor não foi exibido.'
+```
+
+No Ubuntu, o comando usa `openssl`, normalmente disponível por padrão. Se o comando não existir, instale o pacote `openssl` pelo gerenciador da distribuição. Não precisa enviar o segredo para ninguém.
+
+### 3. Validar, iniciar e conferir a aplicação
+
+Estes comandos são iguais no PowerShell e no Bash: valide a configuração principal e a configuração do ambiente de testes, depois construa e inicie os serviços.
+
+```shell
+docker compose config -q
+docker compose --profile tests config -q
+docker compose up --build -d
+docker compose ps
+```
+
+Aguarde `postgres` e `api` ficarem `healthy`. Se ainda estiverem `starting`, aguarde alguns segundos e execute `docker compose ps` novamente.
+
+**Verificar a API no Windows (PowerShell):**
+
+```powershell
+Invoke-RestMethod http://localhost:3000/health
+```
+
+**Verificar a API no Ubuntu (Bash):**
+
+```bash
+curl --fail --show-error http://localhost:3000/health
+```
+
+A resposta deve conter `status: ok` e `service: greencode-api`. Também é possível abrir no navegador `http://localhost:3000/docs` para usar o Swagger ou `http://localhost:3000/docs/json` para consultar o contrato OpenAPI.
+
+### Credenciais iniciais para uma avaliação limpa
+
+Se manteve os valores de demonstração e está usando um volume de banco novo, use em `POST /api/v1/auth/login` no Swagger:
+
+- Usuário: `admin_av2_local`
+- Senha: `TroqueEstaSenhaLocal!2026`
+
+Se alterou as variáveis `BOOTSTRAP_ADMIN_USERNAME` ou `BOOTSTRAP_ADMIN_PASSWORD`, use os valores definidos por você. O seed cria o administrador inicial somente se ele ainda não existir; se o volume já foi usado, o seed preserva as credenciais existentes e mudar o `.env` não redefine a senha de uma conta já criada.
+
+Para acompanhar a inicialização, execute `docker compose logs -f api`. Para parar sem apagar os dados, execute `docker compose down`. **Somente para descartar os dados locais e recomeçar do zero**, execute `docker compose down -v`; isso apaga os volumes do banco deste Compose. Depois, execute novamente `docker compose up --build -d`.
 
 ## O que o sistema cobre
 
@@ -32,8 +104,36 @@ A API gerencia usuários e permissões, organizações e contratos, lotes, equip
 - [Visão, história e arquitetura da AV2](docs/GreenCode-AV2.md)
 - [Épicos e User Stories](docs/epicos-e-user-stories.md)
 - [Guia de testes do professor](docs/guia-de-testes-professor.md)
+- [Registros de decisões arquiteturais (ADRs)](docs/adr/README.md)
 
-Os testes automatizados registrados no ambiente do desenvolvedor passaram: 25 testes unitários/HTTP e 10 de integração. Isso não significa que todas as User Stories estejam homologadas; o guia explica como conferir as funções principais e testar permissões e regras de negócio. A CI remota do GitHub deve ser conferida separadamente.
+## Testes automatizados e CI
+
+A validação manual pelo Swagger é complementar e não substitui os testes automatizados. **O professor pode executar as duas suítes usando Docker Compose, sem instalar Node.js nem PostgreSQL diretamente na máquina.** Os comandos abaixo funcionam tanto no PowerShell (Windows) quanto no Bash (Ubuntu), a partir da raiz do projeto, com o `.env` configurado conforme este README.
+
+### 1. Testes unitários/HTTP
+
+```shell
+docker compose --profile tests run --rm --no-deps test-runner npm test
+```
+
+Esse comando constrói/usa a imagem do `test-runner`, executa o build TypeScript e roda os testes unitários/HTTP. A opção `--no-deps` evita iniciar o serviço PostgreSQL de testes, que não é necessário para esses casos.
+
+### 2. Testes de integração com PostgreSQL
+
+```shell
+docker compose --profile tests run --rm test-runner
+```
+
+Esse comando aguarda o serviço `postgres-test`, aplica as migrações, executa o seed e roda `npm run test:integration`. A base é isolada (`greencode_test`). Não altere a URL para apontar ao banco principal de avaliação ou a um banco de produção.
+
+Na validação local da versão com os testes críticos do Dia 1, os resultados observados foram **25 testes unitários/HTTP aprovados, 0 falhas**, e **13 testes de integração aprovados, 0 falhas**. A contagem pode mudar quando novos testes forem adicionados; confira sempre o resumo real do comando.
+
+### 3. Teste de fumaça Docker Compose no GitHub Actions
+
+O workflow `.github/workflows/ci.yml` inclui um job que constrói a imagem, inicia PostgreSQL e API via Docker Compose em um runner Ubuntu e verifica `GET /health`. A configuração do workflow não prova que um run específico passou: após publicar alterações, confira o resultado do commit correspondente na aba Actions. O teste de fumaça não substitui os testes unitários/HTTP ou de integração.
+
+Os testes aprovados dão evidência somente para os cenários executados; não representam homologação automática de todas as User Stories. Consulte também o [guia de testes do professor](docs/guia-de-testes-professor.md).
+
 
 ## Tecnologias principais
 

@@ -42,3 +42,100 @@ jobs:
       - run: npm run db:seed
       - run: npm test
       - run: npm run test:integration
+
+  docker-compose-smoke:
+    name: Docker Compose smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # A unique Compose project owns only volumes created for this CI run.
+      COMPOSE_PROJECT_NAME: greencode-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and verify API + PostgreSQL with Docker Compose
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          cleanup() {
+            status=$?
+            trap - EXIT
+            if [ "$status" -ne 0 ]; then
+              echo "::group::Docker Compose diagnostics (failure)"
+              docker compose logs --no-color --tail=200 api postgres || true
+              echo "::endgroup::"
+            fi
+            # COMPOSE_PROJECT_NAME is unique to this run, so these volumes are CI-owned.
+            docker compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+            rm -f .env
+            exit "$status"
+          }
+          trap cleanup EXIT
+
+          # These credentials are throwaway values for this isolated CI run only.
+          cat > .env <<'ENV_EOF'
+          POSTGRES_USER=greencode_ci_smoke
+          POSTGRES_PASSWORD=ci_smoke_only_2026
+          POSTGRES_DB=greencode_smoke
+          JWT_SECRET=ci-smoke-only-jwt-secret-0123456789-abcdef
+          BOOTSTRAP_ADMIN_USERNAME=ci_smoke_admin
+          BOOTSTRAP_ADMIN_NAME=CI Smoke Administrator
+          BOOTSTRAP_ADMIN_PASSWORD=CI-Smoke-Admin-Pass-2026!
+          ENV_EOF
+
+          docker compose config -q
+          docker compose build api
+          docker compose up -d postgres
+
+          postgres_id="$(docker compose ps --all --quiet postgres)"
+          if [ -z "$postgres_id" ]; then
+            echo "PostgreSQL container was not created." >&2
+            exit 1
+          fi
+
+          postgres_healthy=false
+          for attempt in $(seq 1 60); do
+            health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$postgres_id" 2>/dev/null || true)"
+            state="$(docker inspect --format '{{.State.Status}}' "$postgres_id" 2>/dev/null || true)"
+            if [ "$health" = "healthy" ]; then
+              postgres_healthy=true
+              break
+            fi
+            if [ "$state" = "exited" ] || [ "$health" = "unhealthy" ]; then
+              echo "PostgreSQL did not become healthy (state=$state, health=$health)." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          if [ "$postgres_healthy" != "true" ]; then
+            echo "Timed out waiting for PostgreSQL healthcheck." >&2
+            exit 1
+          fi
+
+          docker compose up -d api
+          api_healthy=false
+          for attempt in $(seq 1 120); do
+            api_id="$(docker compose ps --all --quiet api)"
+            if [ -n "$api_id" ]; then
+              health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$api_id" 2>/dev/null || true)"
+              state="$(docker inspect --format '{{.State.Status}}' "$api_id" 2>/dev/null || true)"
+              if [ "$state" = "exited" ] || [ "$health" = "unhealthy" ]; then
+                echo "API did not become healthy (state=$state, health=$health)." >&2
+                exit 1
+              fi
+              if response="$(curl --fail --silent --show-error --max-time 2 http://127.0.0.1:3000/health 2>/dev/null)" \
+                && [ "$health" = "healthy" ] \
+                && [[ "$response" == *'"status":"ok"'* ]] \
+                && [[ "$response" == *'"service":"greencode-api"'* ]]; then
+                api_healthy=true
+                break
+              fi
+            fi
+            sleep 2
+          done
+
+          if [ "$api_healthy" != "true" ]; then
+            echo "Timed out waiting for a healthy API and successful GET /health." >&2
+            exit 1
+          fi
+          echo "Docker Compose smoke test passed: PostgreSQL healthy and GET /health returned HTTP 2xx with the expected service payload."
