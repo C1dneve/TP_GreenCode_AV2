@@ -349,7 +349,9 @@ Os testes críticos incluem:
 
 O teste de rollback cria e remove um gatilho temporário apenas no banco de teste; não adiciona ganchos ao código de produção.
 
-Na validação local da versão com as alterações do Dia 1, os resultados observados foram **25 testes unitários/HTTP aprovados, 0 falhas**, e **13 testes de integração aprovados, 0 falhas**. A contagem pode mudar se a suíte for expandida; sempre use o resumo real do comando como evidência.
+Na execução local registrada em 25/10/2026, a suíte de testes unitários/HTTP terminou com **25 testes aprovados e 0 falhas**, e a suíte de integração com PostgreSQL terminou com **13 testes aprovados e 0 falhas**. Também foram validadas a configuração e a geração do Prisma Client, a compilação TypeScript, a aplicação das migrations e duas execuções consecutivas da seed no banco principal da aplicação. O endpoint `GET /health` retornou `status: ok` e `service: greencode-api`.
+
+Esses resultados documentam a execução local nessa data. A contagem pode mudar quando novos testes forem adicionados; consulte sempre o resumo real dos comandos. Os testes aprovados fornecem evidência apenas dos cenários executados e não representam homologação automática de todas as User Stories.
 
 ### 6.3. Teste de fumaça Docker Compose no GitHub Actions
 
@@ -357,18 +359,23 @@ O job `Docker Compose smoke test`, em `.github/workflows/ci.yml`, constrói a im
 
 Depois de publicar alterações que mudam o workflow, abra a aba **Actions** do GitHub e confira o run do commit correspondente. A existência do job no YAML não significa, por si só, que ele já passou. Esse teste também não substitui as suítes unitária/HTTP e de integração.
 
-### 6.4. Execução direta com Node.js (alternativa)
+### 6.4. Validação do Prisma e build via Docker Compose
 
-A execução direta só é necessária para quem tem Node.js 24 e acesso a um PostgreSQL de teste configurado. Use uma base exclusiva cujo nome contenha `test`, configure `DATABASE_URL` e `JWT_SECRET` com valores de teste e execute:
+A validação e a compilação também podem ser executadas dentro dos containers, sem instalar Node.js diretamente no computador. Primeiro, inicie a aplicação conforme a seção 1 deste guia, caso ainda não esteja em execução.
+
+Execute os comandos abaixo na raiz do projeto:
 
 ```shell
-npm run prisma:validate
-npm run build
-npm test
-npm run test:integration
+docker compose exec api npm run prisma:validate
+docker compose exec api npm run prisma:generate
+docker compose exec api npm run build
 ```
 
-`npm run test:integration` exige que o PostgreSQL esteja disponível, que as migrações possam ser aplicadas e que o usuário do banco tenha permissão para criar/remover o gatilho de teste de rollback. Não use credenciais reais.
+Os comandos verificam o schema do Prisma, geram o Prisma Client e compilam o TypeScript dentro do container da API.
+
+As suítes automatizadas devem ser executadas pelos comandos das seções 6.1 e 6.2: a primeira executa os testes unitários/HTTP e a segunda executa os testes de integração com PostgreSQL em um banco de teste isolado.
+
+Se o container da API não estiver em execução, inicie os serviços conforme a seção 1 antes de usar `docker compose exec`.
 
 ## 7. Como registrar a avaliação
 

@@ -24,6 +24,8 @@ if [ ! -f .env ]; then cp .env.example .env; fi
 
 Os valores padrão de `.env.example` destinam-se exclusivamente à avaliação local e podem ser mantidos para uma demonstração isolada. Não os utilize em produção e não compartilhe nem versione `.env`. Se mudar `POSTGRES_PASSWORD`, use letras, números e `_` para evitar problemas de codificação na URL de conexão.
 
+<!-- 146*39*61*010 duvido que alguem possa pensar nisso parte do meu RA-->
+
 ### 2. Gerar um segredo JWT aleatório
 
 Gere um segredo aleatório e grave-o na linha `JWT_SECRET` do `.env`. Escolha o bloco referente ao terminal que está usando.
@@ -82,6 +84,26 @@ curl --fail --show-error http://localhost:3000/health
 
 A resposta deve conter `status: ok` e `service: greencode-api`. Também é possível abrir no navegador `http://localhost:3000/docs` para usar o Swagger ou `http://localhost:3000/docs/json` para consultar o contrato OpenAPI.
 
+#### Executar comandos Prisma
+
+A configuração do Docker Compose fornece a variável `DATABASE_URL` à API, usando o endereço interno do serviço PostgreSQL (`postgres:5432`). Por isso, execute os comandos Prisma dentro do container da API, depois que ele estiver iniciado. Não é necessário adicionar `DATABASE_URL` ao `.env.example` para esse fluxo.
+
+Para validar o schema e gerar o Prisma Client:
+
+```shell
+docker compose exec api npm run prisma:validate
+docker compose exec api npm run prisma:generate
+```
+
+Para aplicar as migrations pendentes e preparar os dados demonstrativos:
+
+```shell
+docker compose exec api npm run db:deploy
+docker compose exec api npm run db:seed
+```
+
+Esses comandos utilizam o banco configurado para a aplicação. Não execute `docker compose down -v` como parte da rotina de validação, pois essa opção apaga os volumes do banco.
+
 ### Credenciais iniciais para uma avaliação limpa
 
 Se manteve os valores de demonstração e está usando um volume de banco novo, use em `POST /api/v1/auth/login` no Swagger:
@@ -90,6 +112,8 @@ Se manteve os valores de demonstração e está usando um volume de banco novo, 
 - Senha: `TroqueEstaSenhaLocal!2026`
 
 Se alterou as variáveis `BOOTSTRAP_ADMIN_USERNAME` ou `BOOTSTRAP_ADMIN_PASSWORD`, use os valores definidos por você. O seed cria o administrador inicial somente se ele ainda não existir; se o volume já foi usado, o seed preserva as credenciais existentes e mudar o `.env` não redefine a senha de uma conta já criada.
+
+O mesmo seed prepara uma massa demonstrativa de organizações, contratos, lotes e equipamentos com estados variados, além dos parâmetros globais. Os registros usam IDs e códigos reservados para demonstração: execuções repetidas não duplicam nem atualizam os registros já encontrados e não removem dados. Se houver colisão com um identificador reservado, o seed falha sem substituir o registro existente.
 
 Para acompanhar a inicialização, execute `docker compose logs -f api`. Para parar sem apagar os dados, execute `docker compose down`. **Somente para descartar os dados locais e recomeçar do zero**, execute `docker compose down -v`; isso apaga os volumes do banco deste Compose. Depois, execute novamente `docker compose up --build -d`.
 
@@ -126,7 +150,9 @@ docker compose --profile tests run --rm test-runner
 
 Esse comando aguarda o serviço `postgres-test`, aplica as migrações, executa o seed e roda `npm run test:integration`. A base é isolada (`greencode_test`). Não altere a URL para apontar ao banco principal de avaliação ou a um banco de produção.
 
-Na validação local da versão com os testes críticos do Dia 1, os resultados observados foram **25 testes unitários/HTTP aprovados, 0 falhas**, e **13 testes de integração aprovados, 0 falhas**. A contagem pode mudar quando novos testes forem adicionados; confira sempre o resumo real do comando.
+Na execução local registrada em 25/10/2026, os testes unitários/HTTP terminaram com **25 testes aprovados e 0 falhas**, e os testes de integração com PostgreSQL terminaram com **13 testes aprovados e 0 falhas**. Também foram validadas a configuração e a geração do Prisma Client, a compilação TypeScript, a aplicação das migrations e duas execuções consecutivas da seed no banco principal. Por fim, `GET /health` retornou `status: ok` e `service: greencode-api`.
+
+Esses resultados documentam a execução local nessa data. A contagem pode mudar quando novos testes forem adicionados; consulte sempre o resumo real dos comandos. Os testes aprovados fornecem evidência apenas dos cenários executados e não representam homologação automática de todas as User Stories.
 
 ### 3. Teste de fumaça Docker Compose no GitHub Actions
 
