@@ -2,6 +2,7 @@ import type { Prisma } from "../../generated/prisma/client.js";
 import { errors, isPrismaCode } from "../../shared/domain-error.js";
 import { assertRole } from "../../shared/authorization.js";
 import { pageMeta } from "../../shared/pagination.js";
+import { requireExpectedVersion } from "../../shared/version.js";
 import { ContratosRepository } from "./contratos.repository.js";
 function status(row: { ativo: boolean; dataCancelamento: Date | null; dataVencimento: Date }, now = new Date()) { return !row.ativo || row.dataCancelamento ? "CANCELADO" : row.dataVencimento > now ? "VIGENTE" : "VENCIDO"; }
 function view(row: any) { if (!row) return row; return { ...row, status: status(row) }; }
@@ -43,7 +44,7 @@ export class ContratosService {
   }
   async update(id: string, input: { versaoEsperada: number; dataVencimento?: string; valorMensal?: string; clausulas?: string[]; renovacaoAutomatica?: boolean }, actorId: string, requestId: string, actorRole: string) {
     assertRole(actorRole, ["ADMINISTRADOR", "OPERADOR_CADASTRO"]);
-    const { versaoEsperada, ...fields } = input; if (!Object.keys(fields).length) throw errors.badRequest("VALIDATION_ERROR", "Informe ao menos um campo para atualização.");
+    const { versaoEsperada, ...fields } = input; requireExpectedVersion(versaoEsperada); if (!Object.keys(fields).length) throw errors.badRequest("VALIDATION_ERROR", "Informe ao menos um campo para atualização.");
     return this.repository.transaction(async tx => { const current = await tx.findById(id); if (!current) throw errors.notFound("CONTRACT_NOT_FOUND", "Contrato não encontrado."); if (current.versao !== versaoEsperada) throw errors.conflict("VERSION_CONFLICT", "Contrato alterado por outra operação."); if (status(current) === "CANCELADO") throw errors.conflict("CONTRACT_CANCELLED", "Contrato cancelado não pode ser atualizado.");
       const data: Prisma.ContratoUpdateManyMutationInput = { versao: { increment: 1 } }; if (fields.dataVencimento !== undefined) {
         const v = date(fields.dataVencimento); const now = new Date();
@@ -54,17 +55,19 @@ export class ContratosService {
       const updated = await tx.updateVersioned(id, versaoEsperada, data); if (!updated) throw errors.conflict("VERSION_CONFLICT", "Contrato alterado por outra operação."); const actor = await tx.actorName(actorId); await tx.recordAudit({ atorUsuarioId: actorId, atorNomeSnapshot: actor?.nome, acao: "ATUALIZACAO_CONTRATO", entidade: "Contrato", entidadeId: id, resultado: "SUCESSO", requestId }); return view(updated);
     }, true);
   }
-  async renew(id: string, input: { dataVencimento: string; valorMensal?: string; clausulas?: string[]; renovacaoAutomatica?: boolean; versaoEsperada?: number }, actorId: string, requestId: string, actorRole: string) {
+  async renew(id: string, input: { dataVencimento: string; valorMensal?: string; clausulas?: string[]; renovacaoAutomatica?: boolean; versaoEsperada: number }, actorId: string, requestId: string, actorRole: string) {
     assertRole(actorRole, ["ADMINISTRADOR", "OPERADOR_CADASTRO"]);
+    requireExpectedVersion(input.versaoEsperada);
     const nextDate = date(input.dataVencimento);
-    try { return await this.repository.transaction(async tx => { const old = await tx.findById(id); if (!old) throw errors.notFound("CONTRACT_NOT_FOUND", "Contrato não encontrado."); if (status(old) !== "VIGENTE") throw errors.conflict("CONTRACT_NOT_RENEWABLE", "Somente contrato vigente pode ser renovado."); if (input.versaoEsperada !== undefined && input.versaoEsperada !== old.versao) throw errors.conflict("VERSION_CONFLICT", "Contrato alterado por outra operação."); if (nextDate <= old.dataVencimento) throw errors.badRequest("VALIDATION_ERROR", "Novo vencimento deve ser posterior ao anterior.");
-      const closed = await tx.updateVersioned(id, old.versao, { ativo: false, dataCancelamento: new Date(), versao: { increment: 1 } }); if (!closed) throw errors.conflict("VERSION_CONFLICT", "Contrato alterado por outra operação.");
+    try { return await this.repository.transaction(async tx => { const old = await tx.findById(id); if (!old) throw errors.notFound("CONTRACT_NOT_FOUND", "Contrato não encontrado."); if (input.versaoEsperada !== old.versao) throw errors.conflict("VERSION_CONFLICT", "Contrato alterado por outra operação."); if (status(old) !== "VIGENTE") throw errors.conflict("CONTRACT_NOT_RENEWABLE", "Somente contrato vigente pode ser renovado."); if (nextDate <= old.dataVencimento) throw errors.badRequest("VALIDATION_ERROR", "Novo vencimento deve ser posterior ao anterior.");
+      const closed = await tx.updateVersioned(id, input.versaoEsperada, { ativo: false, dataCancelamento: new Date(), versao: { increment: 1 } }); if (!closed) throw errors.conflict("VERSION_CONFLICT", "Contrato alterado por outra operação.");
       const created = await tx.create({ organizacaoId: old.organizacaoId, dataVencimento: nextDate, valorMensal: input.valorMensal === undefined ? old.valorMensal : money(input.valorMensal), clausulas: input.clausulas ?? old.clausulas, renovacaoAutomatica: input.renovacaoAutomatica ?? old.renovacaoAutomatica });
       const actor = await tx.actorName(actorId); await tx.recordAudit({ atorUsuarioId: actorId, atorNomeSnapshot: actor?.nome, acao: "RENOVACAO_CONTRATO_ENCERRAMENTO", entidade: "Contrato", entidadeId: old.id, resultado: "SUCESSO", requestId, detalhes: { novoContratoId: created.id } }); await tx.recordAudit({ atorUsuarioId: actorId, atorNomeSnapshot: actor?.nome, acao: "RENOVACAO_CONTRATO_CRIACAO", entidade: "Contrato", entidadeId: created.id, resultado: "SUCESSO", requestId, detalhes: { contratoAnteriorId: old.id } }); return view(created);
     }, true); } catch (error) { if (isPrismaCode(error, "P2034")) throw errors.conflict("CONCURRENT_MODIFICATION", "Operação concorrente de renovação; tente novamente."); throw error; }
   }
-  async cancel(id: string, version: number | undefined, actorId: string, requestId: string, actorRole: string) {
+  async cancel(id: string, version: number, actorId: string, requestId: string, actorRole: string) {
     assertRole(actorRole, ["ADMINISTRADOR", "OPERADOR_CADASTRO"]);
-    await this.repository.transaction(async tx => { const row = await tx.findById(id); if (!row) throw errors.notFound("CONTRACT_NOT_FOUND", "Contrato não encontrado."); if (status(row) === "CANCELADO") throw errors.conflict("CONTRACT_ALREADY_CANCELLED", "Contrato já está cancelado."); if (version !== undefined && version !== row.versao) throw errors.conflict("VERSION_CONFLICT", "Contrato alterado por outra operação."); const updated = await tx.updateVersioned(id, row.versao, { ativo: false, dataCancelamento: new Date(), versao: { increment: 1 } }); if (!updated) throw errors.conflict("VERSION_CONFLICT", "Contrato alterado por outra operação."); const actor = await tx.actorName(actorId); await tx.recordAudit({ atorUsuarioId: actorId, atorNomeSnapshot: actor?.nome, acao: "CANCELAMENTO_CONTRATO", entidade: "Contrato", entidadeId: id, resultado: "SUCESSO", requestId }); }, true);
+    requireExpectedVersion(version);
+    await this.repository.transaction(async tx => { const row = await tx.findById(id); if (!row) throw errors.notFound("CONTRACT_NOT_FOUND", "Contrato não encontrado."); if (version !== row.versao) throw errors.conflict("VERSION_CONFLICT", "Contrato alterado por outra operação."); if (status(row) === "CANCELADO") throw errors.conflict("CONTRACT_ALREADY_CANCELLED", "Contrato já está cancelado."); const updated = await tx.updateVersioned(id, version, { ativo: false, dataCancelamento: new Date(), versao: { increment: 1 } }); if (!updated) throw errors.conflict("VERSION_CONFLICT", "Contrato alterado por outra operação."); const actor = await tx.actorName(actorId); await tx.recordAudit({ atorUsuarioId: actorId, atorNomeSnapshot: actor?.nome, acao: "CANCELAMENTO_CONTRATO", entidade: "Contrato", entidadeId: id, resultado: "SUCESSO", requestId }); }, true);
   }
 }

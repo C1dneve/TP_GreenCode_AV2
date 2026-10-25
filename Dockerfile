@@ -10,6 +10,7 @@ RUN npm ci
 
 COPY prisma ./prisma
 COPY src ./src
+COPY scripts ./scripts
 COPY prisma.config.ts tsconfig.json ./
 
 # Prisma lê DATABASE_URL ao carregar prisma.config.ts durante a geração do cliente.

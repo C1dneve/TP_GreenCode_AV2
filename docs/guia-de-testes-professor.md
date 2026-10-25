@@ -108,10 +108,10 @@ A resposta deve conter `status: ok` e `service: greencode-api`. Abra no navegado
 
 Em uma avaliação com banco novo e valores de demonstração mantidos no `.env`, use em `POST /api/v1/auth/login`:
 
-- **Usuário:** `admin_av2_local`
-- **Senha:** `TroqueEstaSenhaLocal!2026`
+- **Usuário:** use o valor de `BOOTSTRAP_ADMIN_USERNAME` no `.env` local.
+- **Senha:** use o valor de `BOOTSTRAP_ADMIN_PASSWORD` no `.env` local; a senha não é repetida neste guia.
 
-Se alterou `BOOTSTRAP_ADMIN_USERNAME` ou `BOOTSTRAP_ADMIN_PASSWORD`, use os valores definidos por você. O seed cria o administrador inicial somente se ele ainda não existir; ele preserva a conta existente e não redefine a senha ao mudar as variáveis.
+O seed cria o administrador inicial somente se ele ainda não existir; ele preserva a conta existente e não redefine a senha ao mudar as variáveis.
 
 ### 1.7 Logs, parada e reinicialização
 
@@ -164,14 +164,14 @@ Como Administrador, teste `GET /api/v1/usuarios` (esperado `200`) e crie uma con
 {
   "usuario": "avaliacao_operador",
   "nome": "Operador de Avaliação",
-  "senha": "TroqueEstaSenha!2026",
+  "senha": "<substitua-pela-senha-local-de-teste-com-12-ou-mais-caracteres>",
   "papel": "OPERADOR_CADASTRO"
 }
 ```
 
-Repita com logins diferentes e papéis `GESTOR_ALMOXARIFADO` e `AUDITOR`. Guarde as senhas apenas no ambiente de teste. Resposta esperada na criação: `201`; a resposta não deve incluir senha ou hash.
+Substitua o valor de `senha` pelo segredo de teste escolhido localmente antes de enviar a requisição. Repita com logins diferentes e papéis `GESTOR_ALMOXARIFADO` e `AUDITOR`. Guarde as senhas apenas no ambiente de teste. Resposta esperada na criação: `201`; a resposta não deve incluir senha ou hash.
 
-Teste `GET /api/v1/usuarios/{usuarioId}`, `PATCH /api/v1/usuarios/{usuarioId}`, `POST /api/v1/usuarios/{usuarioId}/redefinicao-senha`, `/desativacao` e `/reativacao`. Para `PATCH`, informe `versaoEsperada` conforme a última resposta. Redefinição recebe `novaSenha` (mínimo de 12 caracteres) e responde `204`; desativação e reativação também respondem `204`.
+Teste `GET /api/v1/usuarios/{usuarioId}`, `PATCH /api/v1/usuarios/{usuarioId}`, `POST /api/v1/usuarios/{usuarioId}/redefinicao-senha`, `/desativacao` e `/reativacao`. Para `PATCH`, informe `versaoEsperada` conforme a última resposta. Redefinição recebe `novaSenha` (mínimo de 12 caracteres) e `versaoEsperada`, respondendo `204`; desativação e reativação também exigem `versaoEsperada` e respondem `204`. A alteração da própria senha em `/api/v1/auth/change-password` exige `versaoEsperada` junto com `senhaAtual` e `novaSenha`.
 
 Para conferir a autorização, entre no Swagger como `OPERADOR_CADASTRO`, `GESTOR_ALMOXARIFADO` e `AUDITOR` e teste `GET /api/v1/usuarios`. Esperado: `403`. Um token ausente, inválido ou revogado deve receber `401`.
 
@@ -190,7 +190,7 @@ Use `POST /api/v1/organizacoes`:
 }
 ```
 
-Esperado: `201`. Guarde o `id` retornado como `<organizacaoId>`. Em seguida teste `GET /api/v1/organizacoes`, `GET /api/v1/organizacoes/{organizacaoId}` e `PATCH /api/v1/organizacoes/{organizacaoId}`. O PATCH exige `versaoEsperada` e pelo menos um campo permitido; esperado `200` e versão incrementada. Teste também `/desativacao` e `/reativacao` (esperado `204`). A desativação deve ser recusada com `409` se existir algum lote dessa organização que ainda não foi finalizado.
+Esperado: `201`. Guarde o `id` retornado como `<organizacaoId>`. Em seguida teste `GET /api/v1/organizacoes`, `GET /api/v1/organizacoes/{organizacaoId}` e `PATCH /api/v1/organizacoes/{organizacaoId}`. O PATCH exige `versaoEsperada` e pelo menos um campo permitido; esperado `200` e versão incrementada. Teste também `/desativacao` e `/reativacao`, enviando `versaoEsperada` atual (esperado `204`). A desativação deve ser recusada com `409` se existir algum lote dessa organização que ainda não foi finalizado.
 
 Se o CNPJ do exemplo já estiver usado, escolha outro CNPJ de teste válido. Um CNPJ inválido deve ser recusado; duplicidade deve resultar em conflito, normalmente `409`.
 
@@ -211,7 +211,7 @@ Substitua `<data-e-hora-ISO-futura>` por uma data/hora futura no formato ISO 860
 
 Teste `GET /api/v1/contratos`, `GET /api/v1/contratos/{contratoId}`, `GET /api/v1/organizacoes/{organizacaoId}/contratos` e a consulta aninhada `/api/v1/organizacoes/{organizacaoId}/contratos/{contratoId}`. Devem responder `200` para registros existentes. O contrato aninhado deve retornar `404` se o contrato não pertencer à organização informada.
 
-Teste `PATCH /api/v1/contratos/{contratoId}` com `versaoEsperada` e um campo permitido. Para renovar, use `POST /api/v1/contratos/{contratoId}/renovacao` com um novo `dataVencimento` posterior ao anterior. Esperado: `201` para o novo contrato; o anterior continua consultável no histórico. Teste `POST /api/v1/contratos/{contratoId}/cancelamento`; esperado `204`. Um contrato cancelado não pode ser editado/renovado, e cancelar novamente deve gerar `409`.
+Teste `PATCH /api/v1/contratos/{contratoId}` com `versaoEsperada` e um campo permitido. Para renovar, use `POST /api/v1/contratos/{contratoId}/renovacao` com `dataVencimento` posterior ao anterior e `versaoEsperada` do contrato atual. Esperado: `201` para o novo contrato; o anterior continua consultável no histórico. Teste `POST /api/v1/contratos/{contratoId}/cancelamento` com `versaoEsperada` do contrato atual; esperado `204`. Um contrato cancelado não pode ser editado/renovado, e cancelar novamente deve gerar `409`.
 
 ### D. Lote e equipamento
 
@@ -247,11 +247,11 @@ Esperado: `201`, com `codigoBarrasInterno` gerado pelo servidor e `statusRastrea
 
 Teste `GET /api/v1/lotes`, `GET /api/v1/lotes/{loteId}`, `PATCH /api/v1/lotes/{loteId}`, `GET /api/v1/lotes/{loteId}/equipamentos`, `GET /api/v1/equipamentos`, `GET /api/v1/equipamentos/{equipamentoId}` e `PATCH /api/v1/equipamentos/{equipamentoId}`. Atualizações exigem `versaoEsperada` e respondem `200` se válidas.
 
-Para testar estado físico, use `POST /api/v1/equipamentos/{equipamentoId}/estado-fisico` com `versaoEsperada` e `estadoFisico`. Uma degradação de duas ou mais categorias exige `justificativa`. Para status de rastreamento, use `/status-rastreamento`; a justificativa é sempre obrigatória. Tentar ir para `EM_DESMONTE` antes de `AGUARDANDO_DESMONTE` deve retornar `409`.
+Para testar estado físico, use `POST /api/v1/equipamentos/{equipamentoId}/estado-fisico` com `versaoEsperada` e `estadoFisico`. Uma degradação de duas ou mais categorias exige `justificativa`. Para status de rastreamento, use `/status-rastreamento` com `versaoEsperada`; a justificativa é sempre obrigatória. Tentar ir para `EM_DESMONTE` antes de `AGUARDANDO_DESMONTE` deve retornar `409`.
 
 ### E. Triagem, movimentação e finalização
 
-Antes da triagem, confirme que o lote está ativo e tem pelo menos um equipamento ativo aguardando triagem. Execute `POST /api/v1/lotes/{loteId}/triagem`, informando a versão atual se disponível. Esperado: `200`, lote em `TRIAGEM_CONCLUIDA` e equipamento em `AGUARDANDO_DESMONTE`. A API faz essa transição; não coloque manualmente o equipamento em `EM_TRIAGEM` antes de executar a triagem.
+Antes da triagem, confirme que o lote está ativo e tem pelo menos um equipamento ativo aguardando triagem. Execute `POST /api/v1/lotes/{loteId}/triagem` com `versaoEsperada` obrigatória, obtida da resposta mais recente do lote. Esperado: `200`, lote em `TRIAGEM_CONCLUIDA` e equipamento em `AGUARDANDO_DESMONTE`. A API faz essa transição; não coloque manualmente o equipamento em `EM_TRIAGEM` antes de executar a triagem.
 
 Registre uma movimentação com `POST /api/v1/equipamentos/{equipamentoId}/movimentacoes`:
 
@@ -264,9 +264,9 @@ Registre uma movimentação com `POST /api/v1/equipamentos/{equipamentoId}/movim
 
 Esperado: `201`. O servidor define responsável, data/hora e origem. Em seguida consulte `GET /api/v1/movimentacoes`, `GET /api/v1/movimentacoes/{movimentacaoId}` e `GET /api/v1/equipamentos/{equipamentoId}/movimentacoes` com um Administrador ou Auditor.
 
-Depois, faça `POST /api/v1/lotes/{loteId}/encaminhamento` (esperado `200`, estado `ENCAMINHADO`) e `POST /api/v1/lotes/{loteId}/finalizacao` (esperado `200`, estado `FINALIZADO`). Finalizar antes de encaminhar deve retornar `409`. Lote vazio não pode ser triado nem finalizado.
+Depois, faça `POST /api/v1/lotes/{loteId}/encaminhamento` e `POST /api/v1/lotes/{loteId}/finalizacao`, enviando em cada uma a `versaoEsperada` mais recente retornada pelo lote (esperado `200`, estados `ENCAMINHADO` e `FINALIZADO`). Cada transição incrementa a versão do lote uma vez. Finalizar antes de encaminhar deve retornar `409`. Lote vazio não pode ser triado nem finalizado.
 
-Com o lote finalizado, teste suas rotas `/desativacao` e `/reativacao`. Teste também `POST /api/v1/equipamentos/{equipamentoId}/desativacao` e `/reativacao`; confira o campo `ativo` na resposta. O histórico deve ser preservado.
+Com o lote finalizado, teste suas rotas `/desativacao` e `/reativacao`, enviando a `versaoEsperada` atual a cada operação. Teste também `POST /api/v1/equipamentos/{equipamentoId}/desativacao` e `/reativacao`, igualmente com `versaoEsperada`; confira o campo `ativo` e a versão na resposta. O histórico deve ser preservado.
 
 ### F. Parâmetros, auditoria e relatórios
 

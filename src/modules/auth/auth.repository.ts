@@ -18,8 +18,8 @@ export class AuthRepository {
   findRevoked(jti: string) { return this.db.tokenRevogado.findUnique({ where: { jti }, select: { jti: true } }); }
   updateLastAccess(id: string) { return this.db.usuario.update({ where: { id }, data: { ultimoAcesso: new Date() }, select: publicSelect }); }
   revokeToken(input: { jti: string; usuarioId: string; expiraEm: Date }) { return this.db.tokenRevogado.upsert({ where: { jti: input.jti }, update: {}, create: input }); }
-  updatePassword(id: string, expectedAuthVersion: number, senhaHash: string) {
-    return this.db.usuario.updateMany({ where: { id, authVersion: expectedAuthVersion }, data: { senhaHash, authVersion: { increment: 1 }, versao: { increment: 1 } } }).then(result => result.count === 1);
+  updatePassword(id: string, versaoEsperada: number, expectedAuthVersion: number, senhaHash: string) {
+    return this.db.usuario.updateMany({ where: { id, versao: versaoEsperada, authVersion: expectedAuthVersion }, data: { senhaHash, authVersion: { increment: 1 }, versao: { increment: 1 } } }).then(result => result.count === 1);
   }
   recordAudit(input: EventoAuditoriaInput) { return this.audit.criar(input, this.db as Prisma.TransactionClient); }
 }

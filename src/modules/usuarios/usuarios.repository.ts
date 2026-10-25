@@ -23,10 +23,10 @@ export class UsuariosRepository {
   updateByVersion(id: string, versaoEsperada: number, data: Prisma.UsuarioUpdateManyMutationInput) {
     return this.db.usuario.updateMany({ where: { id, versao: versaoEsperada }, data }).then(async (result) => result.count === 1 ? this.findPublicById(id) : null);
   }
-  deactivate(id: string) { return this.db.usuario.update({ where: { id }, data: { ativo: false, versao: { increment: 1 }, authVersion: { increment: 1 } } }); }
-  reactivate(id: string) { return this.db.usuario.update({ where: { id }, data: { ativo: true, versao: { increment: 1 }, authVersion: { increment: 1 } } }); }
-  resetPassword(id: string, expectedAuthVersion: number, senhaHash: string) {
-    return this.db.usuario.updateMany({ where: { id, authVersion: expectedAuthVersion }, data: { senhaHash, authVersion: { increment: 1 }, versao: { increment: 1 } } }).then(result => result.count === 1);
+  deactivate(id: string, versaoEsperada: number) { return this.db.usuario.updateMany({ where: { id, versao: versaoEsperada }, data: { ativo: false, versao: { increment: 1 }, authVersion: { increment: 1 } } }).then(result => result.count === 1); }
+  reactivate(id: string, versaoEsperada: number) { return this.db.usuario.updateMany({ where: { id, versao: versaoEsperada }, data: { ativo: true, versao: { increment: 1 }, authVersion: { increment: 1 } } }).then(result => result.count === 1); }
+  resetPassword(id: string, versaoEsperada: number, expectedAuthVersion: number, senhaHash: string) {
+    return this.db.usuario.updateMany({ where: { id, versao: versaoEsperada, authVersion: expectedAuthVersion }, data: { senhaHash, authVersion: { increment: 1 }, versao: { increment: 1 } } }).then(result => result.count === 1);
   }
   recordAudit(input: EventoAuditoriaInput) { return this.audit(input); }
 }

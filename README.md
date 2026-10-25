@@ -106,12 +106,7 @@ Esses comandos utilizam o banco configurado para a aplicação. Não execute `do
 
 ### Credenciais iniciais para uma avaliação limpa
 
-Se manteve os valores de demonstração e está usando um volume de banco novo, use em `POST /api/v1/auth/login` no Swagger:
-
-- Usuário: `admin_av2_local`
-- Senha: `TroqueEstaSenhaLocal!2026`
-
-Se alterou as variáveis `BOOTSTRAP_ADMIN_USERNAME` ou `BOOTSTRAP_ADMIN_PASSWORD`, use os valores definidos por você. O seed cria o administrador inicial somente se ele ainda não existir; se o volume já foi usado, o seed preserva as credenciais existentes e mudar o `.env` não redefine a senha de uma conta já criada.
+Para entrar em `POST /api/v1/auth/login` no Swagger em uma base local nova, use os valores de `BOOTSTRAP_ADMIN_USERNAME` e `BOOTSTRAP_ADMIN_PASSWORD` configurados no seu `.env` local. Não copie senhas para documentação compartilhada, capturas de tela ou registros de suporte. O seed cria o administrador inicial somente se ele ainda não existir; se o volume já foi usado, ele preserva as credenciais existentes e mudar o `.env` não redefine a senha de uma conta já criada.
 
 O mesmo seed prepara uma massa demonstrativa de organizações, contratos, lotes e equipamentos com estados variados, além dos parâmetros globais. Os registros usam IDs e códigos reservados para demonstração: execuções repetidas não duplicam nem atualizam os registros já encontrados e não removem dados. Se houver colisão com um identificador reservado, o seed falha sem substituir o registro existente.
 
@@ -164,3 +159,18 @@ Os testes aprovados dão evidência somente para os cenários executados; não r
 ## Tecnologias principais
 
 Node.js 24, TypeScript, Fastify 5, Prisma 7, PostgreSQL 17, JWT e Swagger/OpenAPI. O código é organizado em rotas/controllers, services, repositories e acesso ao banco.
+
+
+### Concorrência otimista nas atualizações
+
+Todas as operações de atualização e ciclo de vida de registros versionados exigem `versaoEsperada` no corpo JSON. O cliente deve obtê-la da representação mais recente do recurso, enviá-la em cada alteração e tratar `409 VERSION_CONFLICT` (ou `409 CONCURRENT_MODIFICATION`) relendo o recurso antes de decidir se reaplica a intenção. Não reutilize automaticamente a versão antiga nem repita uma atualização de forma cega. A gravação compara identificador e versão no banco, incrementa a versão na mesma atualização condicional e grava a auditoria dentro da mesma transação.
+
+### Desvinculação de equipamento de um lote
+
+`PATCH /api/v1/equipamentos/{equipamentoId}` aceita `loteId: null` explícito para desvincular um equipamento, sempre acompanhado de `versaoEsperada`. O campo `loteId` omitido preserva o lote e a posição atuais; um UUID solicita vínculo/mudança para um lote ativo em estado `RECEBIDO`. A desvinculação/mudança só é permitida enquanto `statusRastreamento` for `AGUARDANDO_TRIAGEM` e não houver movimentações. No sucesso, `loteId` e `posicaoNoLote` ficam `null`, a versão é incrementada e a auditoria é registrada atomicamente. Em estado/histórico incompatível, a API responde `409 EQUIPMENT_CANNOT_UNLINK_LOT` sem alterar o registro.
+
+### Swagger UI
+
+A interface interativa fica em `/docs/` e a especificação OpenAPI em `/docs/json`. O botão **Authorize** aceita o JWT no formato Bearer; a autorização não é persistida pela interface após recarregar a página, então autentique novamente quando necessário. Não compartilhe tokens nem os inclua em capturas ou exemplos. O tema visual fica em `src/docs/greencode-swagger.css` e é copiado para o diretório de build pelo script `scripts/copy-assets.mjs`.
+
+Validação local (Node 24 exigido pelo projeto): `npm ci`, `npm run prisma:validate`, `npm test`; com PostgreSQL de teste isolado, configure `DATABASE_URL` para uma base cujo nome contenha `test` e execute `npm run test:integration`. Para cenários com mudança de migração, use uma base dedicada e `npm run db:deploy` antes dos testes.

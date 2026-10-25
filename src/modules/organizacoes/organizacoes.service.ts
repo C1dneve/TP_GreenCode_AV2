@@ -2,6 +2,7 @@ import type { Prisma } from "../../generated/prisma/client.js";
 import { errors, isPrismaCode } from "../../shared/domain-error.js";
 import { assertRole } from "../../shared/authorization.js";
 import { pageMeta } from "../../shared/pagination.js";
+import { requireExpectedVersion } from "../../shared/version.js";
 import { OrganizacoesRepository } from "./organizacoes.repository.js";
 
 function normalizeCnpj(value: string): string { return value.replace(/\D/g, ""); }
@@ -34,8 +35,8 @@ export class OrganizacoesService {
   }
   async update(id: string, input: { versaoEsperada: number; razaoSocial?: string; cnpj?: string; inscricaoEstadual?: string | null; enderecoCompleto?: string | null; telefone?: string | null; email?: string | null }, actorId: string, requestId: string, actorRole: string) {
     assertRole(actorRole, ["ADMINISTRADOR", "OPERADOR_CADASTRO"]);
-    const { versaoEsperada, ...fields } = input; if (!Object.keys(fields).length) throw errors.badRequest("VALIDATION_ERROR", "Informe ao menos um campo para atualização.");
-    const current = await this.repository.findById(id); if (!current) throw errors.notFound("ORGANIZATION_NOT_FOUND", "Organização não encontrada."); if (!current.ativo) throw errors.conflict("ORGANIZATION_INACTIVE", "Não é permitido atualizar organização desativada."); if (current.versao !== versaoEsperada) throw errors.conflict("VERSION_CONFLICT", "A organização foi alterada por outra operação.");
+    const { versaoEsperada, ...fields } = input; requireExpectedVersion(versaoEsperada); if (!Object.keys(fields).length) throw errors.badRequest("VALIDATION_ERROR", "Informe ao menos um campo para atualização.");
+    const current = await this.repository.findById(id); if (!current) throw errors.notFound("ORGANIZATION_NOT_FOUND", "Organização não encontrada."); if (current.versao !== versaoEsperada) throw errors.conflict("VERSION_CONFLICT", "A organização foi alterada por outra operação."); if (!current.ativo) throw errors.conflict("ORGANIZATION_INACTIVE", "Não é permitido atualizar organização desativada.");
     const data: Prisma.OrganizacaoUpdateManyMutationInput = { versao: { increment: 1 } };
     if (fields.razaoSocial !== undefined) { if (!fields.razaoSocial.trim()) throw errors.badRequest("VALIDATION_ERROR", "Razão social não pode ficar vazia."); data.razaoSocial = fields.razaoSocial.trim(); }
     if (fields.cnpj !== undefined) { const cnpj = normalizeCnpj(fields.cnpj); if (!isValidCnpj(cnpj)) throw errors.badRequest("VALIDATION_ERROR", "CNPJ inválido."); data.cnpj = cnpj; }
@@ -46,18 +47,21 @@ export class OrganizacoesService {
     try { return await this.repository.transaction(async tx => { const updated = await tx.updateVersioned(id, versaoEsperada, data); if (!updated) throw errors.conflict("VERSION_CONFLICT", "A organização foi alterada por outra operação."); const actor = await tx.findActorName(actorId); await tx.recordAudit({ atorUsuarioId: actorId, atorNomeSnapshot: actor?.nome, acao: "ATUALIZACAO_ORGANIZACAO", entidade: "Organizacao", entidadeId: id, resultado: "SUCESSO", requestId }); return output(updated); }, true); }
     catch (error) { if (isPrismaCode(error, "P2002")) throw errors.conflict("DUPLICATE_CNPJ", "Já existe uma organização cadastrada com esse CNPJ."); if (isPrismaCode(error, "P2034")) throw errors.conflict("CONCURRENT_MODIFICATION", "A operação conflitou com outra alteração."); throw error; }
   }
-  async deactivate(id: string, version: number | undefined, actorId: string, requestId: string, actorRole: string) {
+  async deactivate(id: string, version: number, actorId: string, requestId: string, actorRole: string) {
     assertRole(actorRole, ["ADMINISTRADOR", "OPERADOR_CADASTRO"]);
+    requireExpectedVersion(version);
     await this.repository.transaction(async tx => {
-      const current = await tx.findById(id); if (!current) throw errors.notFound("ORGANIZATION_NOT_FOUND", "Organização não encontrada."); if (!current.ativo) throw errors.conflict("ORGANIZATION_ALREADY_INACTIVE", "A organização já está desativada.");
-      if (version !== undefined && version !== current.versao) throw errors.conflict("VERSION_CONFLICT", "A organização foi alterada por outra operação.");
+      const current = await tx.findById(id); if (!current) throw errors.notFound("ORGANIZATION_NOT_FOUND", "Organização não encontrada.");
+      if (version !== current.versao) throw errors.conflict("VERSION_CONFLICT", "A organização foi alterada por outra operação.");
+      if (!current.ativo) throw errors.conflict("ORGANIZATION_ALREADY_INACTIVE", "A organização já está desativada.");
       if (await tx.countOpenLots(id)) throw errors.conflict("ORGANIZATION_HAS_OPEN_LOTS", "Não é possível desativar organização com lotes não finalizados.");
-      const updated = await tx.updateVersioned(id, current.versao, { ativo: false, versao: { increment: 1 } }); if (!updated) throw errors.conflict("VERSION_CONFLICT", "A organização foi alterada por outra operação.");
+      const updated = await tx.updateVersioned(id, version, { ativo: false, versao: { increment: 1 } }); if (!updated) throw errors.conflict("VERSION_CONFLICT", "A organização foi alterada por outra operação.");
       const actor = await tx.findActorName(actorId); await tx.recordAudit({ atorUsuarioId: actorId, atorNomeSnapshot: actor?.nome, acao: "DESATIVACAO_ORGANIZACAO", entidade: "Organizacao", entidadeId: id, resultado: "SUCESSO", requestId });
     }, true);
   }
-  async reactivate(id: string, version: number | undefined, actorId: string, requestId: string, actorRole: string) {
+  async reactivate(id: string, version: number, actorId: string, requestId: string, actorRole: string) {
     assertRole(actorRole, ["ADMINISTRADOR", "OPERADOR_CADASTRO"]);
-    await this.repository.transaction(async tx => { const current = await tx.findById(id); if (!current) throw errors.notFound("ORGANIZATION_NOT_FOUND", "Organização não encontrada."); if (current.ativo) throw errors.conflict("ORGANIZATION_ALREADY_ACTIVE", "A organização já está ativa."); if (version !== undefined && version !== current.versao) throw errors.conflict("VERSION_CONFLICT", "A organização foi alterada por outra operação."); const updated = await tx.updateVersioned(id, current.versao, { ativo: true, versao: { increment: 1 } }); if (!updated) throw errors.conflict("VERSION_CONFLICT", "A organização foi alterada por outra operação."); const actor = await tx.findActorName(actorId); await tx.recordAudit({ atorUsuarioId: actorId, atorNomeSnapshot: actor?.nome, acao: "REATIVACAO_ORGANIZACAO", entidade: "Organizacao", entidadeId: id, resultado: "SUCESSO", requestId }); }, true);
+    requireExpectedVersion(version);
+    await this.repository.transaction(async tx => { const current = await tx.findById(id); if (!current) throw errors.notFound("ORGANIZATION_NOT_FOUND", "Organização não encontrada."); if (version !== current.versao) throw errors.conflict("VERSION_CONFLICT", "A organização foi alterada por outra operação."); if (current.ativo) throw errors.conflict("ORGANIZATION_ALREADY_ACTIVE", "A organização já está ativa."); const updated = await tx.updateVersioned(id, version, { ativo: true, versao: { increment: 1 } }); if (!updated) throw errors.conflict("VERSION_CONFLICT", "A organização foi alterada por outra operação."); const actor = await tx.findActorName(actorId); await tx.recordAudit({ atorUsuarioId: actorId, atorNomeSnapshot: actor?.nome, acao: "REATIVACAO_ORGANIZACAO", entidade: "Organizacao", entidadeId: id, resultado: "SUCESSO", requestId }); }, true);
   }
 }

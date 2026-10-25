@@ -128,6 +128,8 @@ test("jornada HTTP real: organização → contrato → lote → equipamento →
   const triagedEquipment = await app.inject({ method: "GET", url: `/api/v1/equipamentos/${equipmentId}`, headers: authorized(token) });
   assert.equal(triagedEquipment.statusCode, 200, triagedEquipment.body);
   assert.equal(triagedEquipment.json().statusRastreamento, "AGUARDANDO_DESMONTE");
+  assert.equal(triagedEquipment.json().versao, equipment.json().versao + 1, "Triagem é uma alteração lógica e incrementa a versão do equipamento uma vez");
+  assert.equal(triage.json().versao, lot.json().versao + 1, "Triagem incrementa a versão do lote uma vez");
 
   const movement = await app.inject({
     method: "POST", url: `/api/v1/equipamentos/${equipmentId}/movimentacoes`, headers: authorized(token),

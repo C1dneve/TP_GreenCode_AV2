@@ -77,8 +77,8 @@ O banco também protege relações e valores únicos — por exemplo, login, CNP
 
 - O CNPJ é validado e não pode se repetir.
 - A data de entrada de um lote não pode ser futura nem ter mais de 90 dias.
-- O fluxo do lote é `RECEBIDO → EM_TRIAGEM → TRIAGEM_CONCLUIDA → ENCAMINHADO → FINALIZADO`.
-- A triagem exige um lote ativo com equipamentos. Ao concluí-la, os equipamentos passam para `AGUARDANDO_DESMONTE`.
+- O fluxo persistido do lote é `RECEBIDO → TRIAGEM_CONCLUIDA → ENCAMINHADO → FINALIZADO`; o início e a conclusão da triagem são tratados atomicamente na mesma operação.
+- A triagem exige lote ativo e todos os equipamentos ativos em `AGUARDANDO_TRIAGEM`, sem falhas de concorrência. Ao concluí-la, o lote passa para `TRIAGEM_CONCLUIDA` e os equipamentos para `AGUARDANDO_DESMONTE`; cada versão é incrementada uma vez por essa alteração lógica.
 - A desmontagem só pode começar depois de `AGUARDANDO_DESMONTE`.
 - Mudanças de estado de rastreamento exigem justificativa. Uma degradação física de duas ou mais categorias também exige justificativa.
 - Uma organização com lote não finalizado não pode ser desativada.

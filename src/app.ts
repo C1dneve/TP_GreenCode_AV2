@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
@@ -45,10 +46,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.register(swagger, {
     openapi: {
       info: {
-        title: "GreenCode API",
-        description: "API REST do sistema de logística reversa GreenCode.",
-        version: "0.1.0",
-      },
+      title: "GreenCode API do CID",
+      description:
+        "API REST do sistema de logística reversa GreenCode do CID.\n\n[Ver documento OpenAPI JSON](/docs/json)",
+      version: "0.1.0",
+    },
       servers: [{ url: "http://localhost:3000" }],
       tags: [{ name: "Health", description: "Estado técnico do serviço" }, { name: "Autenticação", description: "Login e gestão da sessão" }, { name: "Usuários", description: "Gerenciamento administrativo de usuários" }, { name: "Organizações", description: "Cadastro e histórico organizacional" }, { name: "Contratos", description: "Contratos e renovações" }, { name: "Lotes", description: "Ciclo operacional de lotes" }, { name: "Equipamentos", description: "Cadastro e rastreabilidade dos equipamentos" }, { name: "Movimentações", description: "Histórico de movimentações" }, { name: "Auditoria", description: "Trilha de auditoria" }, { name: "Relatórios", description: "Indicadores operacionais" }, { name: "Parâmetros", description: "Parâmetros globais" }],
       components: { securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" } }, schemas: { UsuarioPublico: { type: "object", additionalProperties: false, required: ["id", "usuario", "nome", "papel", "ativo"], properties: { id: { type: "string", format: "uuid" }, usuario: { type: "string" }, nome: { type: "string" }, papel: { type: "string", enum: ["ADMINISTRADOR", "OPERADOR_CADASTRO", "GESTOR_ALMOXARIFADO", "AUDITOR"] }, ativo: { type: "boolean" }, ultimoAcesso: { type: "string", format: "date-time", nullable: true }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" }, versao: { type: "integer" } } } } },
@@ -183,6 +185,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           name: "GreenCode API",
         },
       ],
+      docExpansion: "list",
+      deepLinking: true,
+      filter: true,
+      displayRequestDuration: true,
+    },
+    theme: {
+      title: "GreenCode API — Documentação interativa",
+      css: [{ filename: "greencode-theme.css", content: readFileSync(new URL("./docs/greencode-swagger.css", import.meta.url), "utf8") }],
     },
   });
   return app;

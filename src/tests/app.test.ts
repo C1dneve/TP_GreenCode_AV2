@@ -33,7 +33,7 @@ test("GET /health retorna estado básico do serviço", async () => {
 test("Swagger publica o documento OpenAPI em /docs/json", async () => {
   const response = await app.inject({ method: "GET", url: "/docs/json" });
   assert.equal(response.statusCode, 200);
-  assert.equal(response.json().info.title, "GreenCode API");
+  assert.equal(response.json().info.title, "GreenCode API do CID");
   assert.ok(response.json().paths["/health"]);
 });
 

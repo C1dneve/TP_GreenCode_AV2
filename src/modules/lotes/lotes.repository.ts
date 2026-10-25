@@ -15,10 +15,9 @@ export class LotesRepository {
   create(data: Prisma.LoteUncheckedCreateInput) { return this.db.lote.create({ data, include: { organizacao: { select: { id: true, razaoSocial: true } }, _count: { select: { equipamentos: true } } } }); }
   updateVersioned(id: string, version: number, data: Prisma.LoteUpdateManyMutationInput) { return this.db.lote.updateMany({ where: { id, versao: version }, data }).then(r => r.count === 1 ? this.findById(id) : null); }
   equipmentCount(id: string) { return this.db.equipamento.count({ where: { loteId: id } }); }
-  triageEligibleEquipmentCount(id: string) { return this.db.equipamento.count({ where: { loteId: id, ativo: true, statusRastreamento: "AGUARDANDO_TRIAGEM" } }); }
+  triageEligibleEquipment(id: string) { return this.db.equipamento.findMany({ where: { loteId: id, ativo: true, statusRastreamento: "AGUARDANDO_TRIAGEM" }, select: { id: true, versao: true } }); }
   inactiveEquipmentCount(id: string) { return this.db.equipamento.count({ where: { loteId: id, ativo: false } }); }
-  triageEquipment(id: string) { return this.db.equipamento.updateMany({ where: { loteId: id, ativo: true, statusRastreamento: "AGUARDANDO_TRIAGEM" }, data: { statusRastreamento: "EM_TRIAGEM", versao: { increment: 1 } } }); }
-  concludeTriageEquipment(id: string) { return this.db.equipamento.updateMany({ where: { loteId: id, ativo: true, statusRastreamento: "EM_TRIAGEM" }, data: { statusRastreamento: "AGUARDANDO_DESMONTE", versao: { increment: 1 } } }); }
+  transitionEquipmentForTriage(lotId: string, id: string, version: number) { return this.db.equipamento.updateMany({ where: { id, loteId: lotId, versao: version, ativo: true, statusRastreamento: "AGUARDANDO_TRIAGEM" }, data: { statusRastreamento: "AGUARDANDO_DESMONTE", versao: { increment: 1 } } }).then(result => result.count === 1); }
   listEquipment(id: string, page: number, pageSize: number) { const where = { loteId: id }; return Promise.all([this.db.equipamento.findMany({ where, orderBy: [{ posicaoNoLote: "asc" }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize }), this.db.equipamento.count({ where })]); }
   findActorName(id: string) { return this.db.usuario.findUnique({ where: { id }, select: { nome: true } }); }
 }

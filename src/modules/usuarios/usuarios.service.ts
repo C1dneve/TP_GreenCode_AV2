@@ -3,6 +3,7 @@ import type { PapelUsuario, Prisma } from "../../generated/prisma/client.js";
 import { errors, isPrismaCode } from "../../shared/domain-error.js";
 import { assertRole } from "../../shared/authorization.js";
 import { pageMeta } from "../../shared/pagination.js";
+import { requireExpectedVersion } from "../../shared/version.js";
 import { UsuariosRepository } from "./usuarios.repository.js";
 
 const roles = new Set(["ADMINISTRADOR", "OPERADOR_CADASTRO", "GESTOR_ALMOXARIFADO", "AUDITOR"]);
@@ -35,6 +36,7 @@ export class UsuariosService {
   }
   async update(id: string, input: { versaoEsperada: number; usuario?: string; nome?: string; papel?: PapelUsuario }, actorId: string, requestId: string, actorRole: string) {
     assertRole(actorRole, ["ADMINISTRADOR"]);
+    requireExpectedVersion(input.versaoEsperada);
     if ((input.usuario !== undefined && !input.usuario.trim()) || (input.nome !== undefined && !input.nome.trim()) || (input.usuario === undefined && input.nome === undefined && input.papel === undefined) || (input.papel !== undefined && !roles.has(input.papel))) throw errors.badRequest("VALIDATION_ERROR", "Informe campos válidos para atualização.");
     try {
       return await this.repository.transaction(async (tx) => {
@@ -58,40 +60,46 @@ export class UsuariosService {
       throw error;
     }
   }
-  async deactivate(id: string, actorId: string, requestId: string, actorRole: string) {
+  async deactivate(id: string, versaoEsperada: number, actorId: string, requestId: string, actorRole: string) {
     assertRole(actorRole, ["ADMINISTRADOR"]);
+    requireExpectedVersion(versaoEsperada);
     if (id === actorId) throw errors.conflict("SELF_DEACTIVATION_FORBIDDEN", "Não é permitido desativar a própria conta.");
     try {
       await this.repository.transaction(async (tx) => {
         const target = await tx.findById(id);
         if (!target) throw errors.notFound("USER_NOT_FOUND", "Usuário não encontrado.");
-        if (!target.ativo) return;
+        if (target.versao !== versaoEsperada) throw errors.conflict("VERSION_CONFLICT", "O usuário foi alterado por outra operação.");
+        if (!target.ativo) throw errors.conflict("USER_ALREADY_INACTIVE", "O usuário já está desativado.");
         if (target.papel === "ADMINISTRADOR" && await tx.countActiveAdmins() <= 1) throw errors.conflict("LAST_ADMINISTRATOR", "Não é permitido desativar o último Administrador ativo.");
-        await tx.deactivate(id);
+        if (!await tx.deactivate(id, versaoEsperada)) throw errors.conflict("VERSION_CONFLICT", "O usuário foi alterado por outra operação.");
         const actor = await tx.findActorName(actorId);
         await tx.recordAudit({ atorUsuarioId: actorId, atorNomeSnapshot: actor?.nome, acao: "DESATIVACAO_USUARIO", entidade: "Usuario", entidadeId: id, resultado: "SUCESSO", requestId });
       }, true);
     } catch (error) { if (isPrismaCode(error, "P2034")) throw errors.conflict("CONCURRENT_MODIFICATION", "A operação conflitou com outra alteração concorrente."); throw error; }
   }
-  async reactivate(id: string, actorId: string, requestId: string, actorRole: string) {
+  async reactivate(id: string, versaoEsperada: number, actorId: string, requestId: string, actorRole: string) {
     assertRole(actorRole, ["ADMINISTRADOR"]);
+    requireExpectedVersion(versaoEsperada);
     await this.repository.transaction(async (tx) => {
       const target = await tx.findById(id);
       if (!target) throw errors.notFound("USER_NOT_FOUND", "Usuário não encontrado.");
-      if (target.ativo) return;
-      await tx.reactivate(id);
+      if (target.versao !== versaoEsperada) throw errors.conflict("VERSION_CONFLICT", "O usuário foi alterado por outra operação.");
+      if (target.ativo) throw errors.conflict("USER_ALREADY_ACTIVE", "O usuário já está ativo.");
+      if (!await tx.reactivate(id, versaoEsperada)) throw errors.conflict("VERSION_CONFLICT", "O usuário foi alterado por outra operação.");
       const actor = await tx.findActorName(actorId);
       await tx.recordAudit({ atorUsuarioId: actorId, atorNomeSnapshot: actor?.nome, acao: "REATIVACAO_USUARIO", entidade: "Usuario", entidadeId: id, resultado: "SUCESSO", requestId });
     });
   }
-  async resetPassword(id: string, novaSenha: string, actorId: string, requestId: string, actorRole: string) {
+  async resetPassword(id: string, novaSenha: string, versaoEsperada: number, actorId: string, requestId: string, actorRole: string) {
     assertRole(actorRole, ["ADMINISTRADOR"]);
+    requireExpectedVersion(versaoEsperada);
     if (novaSenha.length < 12) throw errors.badRequest("PASSWORD_POLICY_VIOLATION", "A nova senha deve ter pelo menos 12 caracteres.");
     const target = await this.repository.findById(id);
     if (!target) throw errors.notFound("USER_NOT_FOUND", "Usuário não encontrado.");
+    if (target.versao !== versaoEsperada) throw errors.conflict("VERSION_CONFLICT", "O usuário foi alterado por outra operação.");
     const senhaHash = await bcrypt.hash(novaSenha, 12);
     await this.repository.transaction(async (tx) => {
-      const updated = await tx.resetPassword(id, target.authVersion, senhaHash);
+      const updated = await tx.resetPassword(id, versaoEsperada, target.authVersion, senhaHash);
       if (!updated) throw errors.conflict("CONCURRENT_MODIFICATION", "A senha foi alterada por outra operação.");
       const actor = await tx.findActorName(actorId);
       await tx.recordAudit({ atorUsuarioId: actorId, atorNomeSnapshot: actor?.nome, acao: "REDEFINICAO_SENHA", entidade: "Usuario", entidadeId: id, resultado: "SUCESSO", requestId });

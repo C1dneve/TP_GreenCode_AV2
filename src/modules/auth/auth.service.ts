@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import type { PapelUsuario } from "../../generated/prisma/client.js";
 import { errors, isPrismaCode } from "../../shared/domain-error.js";
 import { AuthRepository } from "./auth.repository.js";
+import { requireExpectedVersion } from "../../shared/version.js";
 
 export interface JwtIssuer { sign(payload: JwtIdentity, options: { expiresIn: "30m"; algorithm: "HS256" }): string }
 export interface JwtIdentity { sub: string; papel: PapelUsuario; jti: string; authVersion: number; iat?: number; exp?: number }
@@ -55,13 +56,16 @@ export class AuthService {
     });
   }
 
-  async changePassword(identity: JwtIdentity, input: { senhaAtual: string; novaSenha: string }, requestId: string) {
+  async changePassword(identity: JwtIdentity, input: { senhaAtual: string; novaSenha: string; versaoEsperada: number }, requestId: string) {
+    requireExpectedVersion(input.versaoEsperada);
     const user = await this.repository.findById(identity.sub);
-    if (!user || !(await bcrypt.compare(input.senhaAtual, user.senhaHash))) throw errors.badRequest("INVALID_CURRENT_PASSWORD", "A senha atual é inválida.");
+    if (!user) throw errors.unauthorized();
+    if (user.versao !== input.versaoEsperada) throw errors.conflict("VERSION_CONFLICT", "O usuário foi alterado por outra operação.");
+    if (!(await bcrypt.compare(input.senhaAtual, user.senhaHash))) throw errors.badRequest("INVALID_CURRENT_PASSWORD", "A senha atual é inválida.");
     if (input.novaSenha.length < 12) throw errors.badRequest("PASSWORD_POLICY_VIOLATION", "A nova senha deve ter pelo menos 12 caracteres.");
     const hash = await bcrypt.hash(input.novaSenha, 12);
     await this.repository.transaction(async (tx) => {
-      const updated = await tx.updatePassword(user.id, user.authVersion, hash);
+      const updated = await tx.updatePassword(user.id, input.versaoEsperada, user.authVersion, hash);
       if (!updated) throw errors.conflict("CONCURRENT_MODIFICATION", "A senha foi alterada por outra operação; autentique-se novamente.");
       await tx.recordAudit({ atorUsuarioId: user.id, atorNomeSnapshot: user.nome, acao: "ALTERACAO_SENHA", entidade: "Usuario", entidadeId: user.id, resultado: "SUCESSO", requestId });
     });

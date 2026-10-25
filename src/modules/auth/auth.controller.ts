@@ -5,5 +5,5 @@ export class AuthController {
   login(body: { usuario: string; senha: string }, requestId: string) { return this.service.login(body, requestId); }
   me(identity: JwtIdentity) { return this.service.me(identity.sub); }
   logout(identity: JwtIdentity, requestId: string) { return this.service.logout(identity, requestId); }
-  changePassword(identity: JwtIdentity, body: { senhaAtual: string; novaSenha: string }, requestId: string) { return this.service.changePassword(identity, body, requestId); }
+  changePassword(identity: JwtIdentity, body: { senhaAtual: string; novaSenha: string; versaoEsperada: number }, requestId: string) { return this.service.changePassword(identity, body, requestId); }
 }

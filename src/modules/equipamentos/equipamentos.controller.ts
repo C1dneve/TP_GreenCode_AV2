@@ -6,5 +6,5 @@ export class EquipamentosController {
   update(id: string, body: any, actorId: string, requestId: string, actorRole: string) { return this.service.update(id, body, actorId, requestId, actorRole); }
   changePhysical(id: string, body: any, actorId: string, requestId: string, actorRole: string) { return this.service.changePhysicalState(id, body, actorId, requestId, actorRole); }
   changeTracking(id: string, body: any, actorId: string, requestId: string, actorRole: string) { return this.service.changeTrackingStatus(id, body, actorId, requestId, actorRole); }
-  activeChange(id: string, activate: boolean, version: number | undefined, actorId: string, requestId: string, actorRole: string) { return this.service.activeChange(id, activate, version, actorId, requestId, actorRole); }
+  activeChange(id: string, activate: boolean, version: number, actorId: string, requestId: string, actorRole: string) { return this.service.activeChange(id, activate, version, actorId, requestId, actorRole); }
 }

@@ -77,9 +77,9 @@ test("todos os endpoints administrativos negam os três papéis não administrad
     { method: "POST", url: "/api/v1/usuarios", payload: { usuario: "novo", nome: "Novo", senha: password, papel: "AUDITOR" } },
     { method: "GET", url: `/api/v1/usuarios/${users[0]!.id}` },
     { method: "PATCH", url: `/api/v1/usuarios/${users[0]!.id}`, payload: { versaoEsperada: 1, nome: "Alterado" } },
-    { method: "POST", url: `/api/v1/usuarios/${users[0]!.id}/desativacao` },
-    { method: "POST", url: `/api/v1/usuarios/${users[0]!.id}/reativacao` },
-    { method: "POST", url: `/api/v1/usuarios/${users[0]!.id}/redefinicao-senha`, payload: { novaSenha: "NewSecurePassword12" } },
+    { method: "POST", url: `/api/v1/usuarios/${users[0]!.id}/desativacao`, payload: { versaoEsperada: 1 } },
+    { method: "POST", url: `/api/v1/usuarios/${users[0]!.id}/reativacao`, payload: { versaoEsperada: 1 } },
+    { method: "POST", url: `/api/v1/usuarios/${users[0]!.id}/redefinicao-senha`, payload: { novaSenha: "NewSecurePassword12", versaoEsperada: 1 } },
   ] as const;
   for (const role of roles.filter((candidate) => candidate !== "ADMINISTRADOR")) {
     const token = await login(role);
