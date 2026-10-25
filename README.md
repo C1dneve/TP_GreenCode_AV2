@@ -150,7 +150,7 @@ docker compose --profile tests run --rm test-runner
 
 Esse comando aguarda o serviço `postgres-test`, aplica as migrações, executa o seed e roda `npm run test:integration`. A base é isolada (`greencode_test`). Não altere a URL para apontar ao banco principal de avaliação ou a um banco de produção.
 
-Na execução local registrada em 25/10/2026, os testes unitários/HTTP terminaram com **25 testes aprovados e 0 falhas**, e os testes de integração com PostgreSQL terminaram com **13 testes aprovados e 0 falhas**. Também foram validadas a configuração e a geração do Prisma Client, a compilação TypeScript, a aplicação das migrations e duas execuções consecutivas da seed no banco principal. Por fim, `GET /health` retornou `status: ok` e `service: greencode-api`.
+Na execução local registrada em 25/10/2026, os testes unitários/HTTP terminaram com **26 testes aprovados e 0 falhas**, e os testes de integração com PostgreSQL terminaram com **13 testes aprovados e 0 falhas**. Também foram validadas a configuração e a geração do Prisma Client, a compilação TypeScript, a aplicação das migrations e duas execuções consecutivas da seed no banco principal. Por fim, `GET /health` retornou `status: ok` e `service: greencode-api`.
 
 Esses resultados documentam a execução local nessa data. A contagem pode mudar quando novos testes forem adicionados; consulte sempre o resumo real dos comandos. Os testes aprovados fornecem evidência apenas dos cenários executados e não representam homologação automática de todas as User Stories.
 

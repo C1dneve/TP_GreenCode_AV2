@@ -277,3 +277,54 @@ test("falha controlada na auditoria reverte a triagem inteira e não persiste au
     await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS "${functionName}"()`);
   }
 });
+
+
+test("finalização prematura de lote retorna 409 e preserva o estado", async () => {
+  assert.ok(app, "Fastify deveria estar inicializado");
+  assert.ok(prisma, "Prisma deveria estar inicializado");
+
+  const application = app;
+  const db = prisma;
+  const token = await login();
+
+  // Reutiliza a fixture existente e registra os IDs para a limpeza automática.
+  const scenario = await createEquipmentScenario(token);
+
+  const before = await db.lote.findUnique({
+    where: { id: scenario.lotId },
+    select: {
+      statusProcessamento: true,
+      versao: true,
+    },
+  });
+
+  assert.ok(before, "O lote de teste deveria existir");
+  assert.equal(before.statusProcessamento, "RECEBIDO");
+
+  const response = await application.inject({
+    method: "POST",
+    url: `/api/v1/lotes/${scenario.lotId}/finalizacao`,
+    headers: authorized(token),
+    payload: {
+      versaoEsperada: before.versao,
+    },
+  });
+
+  assert.equal(response.statusCode, 409, response.body);
+  assert.equal(
+    response.json().error.code,
+    "INVALID_STATE_TRANSITION",
+    response.body,
+  );
+
+  // Confirma diretamente no PostgreSQL que a operação não alterou o lote.
+  const after = await db.lote.findUnique({
+    where: { id: scenario.lotId },
+    select: {
+      statusProcessamento: true,
+      versao: true,
+    },
+  });
+
+  assert.deepEqual(after, before);
+});

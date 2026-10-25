@@ -24,4 +24,4 @@ ENV PORT=3000
 EXPOSE 3000
 
 # Na inicialização, aplica somente migrações versionadas e executa o seed idempotente.
-CMD ["sh", "-c", "npm run db:deploy && npm run db:seed && npm run start"]
+CMD ["sh", "-c", "npm run db:deploy && npm run db:seed && exec node dist/src/server.js"]
