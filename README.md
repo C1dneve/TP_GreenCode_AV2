@@ -8,6 +8,10 @@ A forma preparada para avaliação é usar Docker Compose. Não é necessário i
 
 Abra um terminal na raiz do projeto, onde estão `Dockerfile` e `docker-compose.yml`. Os comandos `docker compose` abaixo são iguais no PowerShell e no terminal do Ubuntu; somente a criação/configuração do arquivo `.env` e a consulta HTTP diferem.
 
+# OBS
+
+Testes e preparação da sua maquina para o sistema estão mais completos em  [Guia de testes do professor](docs/guia-de-testes-professor.md)
+
 ### 1. Criar o arquivo `.env`
 
 **Windows (PowerShell):**
@@ -24,7 +28,7 @@ if [ ! -f .env ]; then cp .env.example .env; fi
 
 Os valores padrão de `.env.example` destinam-se exclusivamente à avaliação local e podem ser mantidos para uma demonstração isolada. Não os utilize em produção e não compartilhe nem versione `.env`. Se mudar `POSTGRES_PASSWORD`, use letras, números e `_` para evitar problemas de codificação na URL de conexão.
 
-<!-- 146*39*61*010 duvido que alguem possa pensar nisso parte do meu RA-->
+<!-- 146*39*61*010 duvido que alguem possa pensar nisso, parte do meu RA-->
 
 ### 2. Gerar um segredo JWT aleatório
 
